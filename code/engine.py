@@ -477,7 +477,7 @@ def build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist
     cv2.putText(hud, f"[Z] Zones: {zn_status}  |  [G] Grid  |  [Q] Quit", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (0, 200, 255), 1)
     y += 18
 
-    cv2.putText(hud, "Draw: Click on cam | [C] Arm | [R] Clear | [P] Preset", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 240, 255), 1)
+    cv2.putText(hud, "Draw: Click cam | [C] Arm | [X] Wipe | [P] Preset", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 240, 255), 1)
 
     grid[TH:TH * 2, TW * 2:TW * 3] = hud
 
@@ -588,7 +588,7 @@ def main():
     print(f"Hotlist Watch : {len(anpr_engine.hotlist)} suspect vehicles loaded")
     print(f"Biometric FRS : {len(face_gallery)} suspects on BOLO watchlist")
     print("Controls HUD  : 'q'=quit | 'n'=fake night | 'h'=hotlist | 't'=tamper | 'z'=zones | 'g'=grid")
-    print("Draw Fence    : Click any camera tile with mouse -> [C]=Arm fence | [R]=Clear | [P]=Reset preset")
+    print("Draw Fence    : Click camera tile with mouse -> [C]=Arm | [X]=Wipe all | [R]=Clear pts | [P]=Reset preset")
     print("=" * 65)
 
     interval = 1.0 / TARGET_ANALYSIS_FPS
@@ -852,6 +852,17 @@ def main():
                         print("🔄 Cleared custom drawing points.")
                     else:
                         print("🔄 Ready to draw. Click any camera tile with mouse to draw a new fence.")
+                elif key == ord('x'):
+                    tz_path = os.path.join(ROOT_DIR, "data", "tactical_zones.json")
+                    try:
+                        with open(tz_path, "w") as f:
+                            json.dump({}, f, indent=2)
+                        fence_manager.reload()
+                        user_points = []
+                        drawing_cam = None
+                        print("🗑️ ALL VIRTUAL FENCES WIPED! Screen is clean (0 fences). Ready to draw fresh with mouse! ✅")
+                    except Exception as e:
+                        print(f"❌ Error wiping zones: {e}")
                 elif key == ord('p'):
                     preset_p = os.path.join(ROOT_DIR, "data", "tactical_zones_preset.json")
                     tz_path = os.path.join(ROOT_DIR, "data", "tactical_zones.json")
