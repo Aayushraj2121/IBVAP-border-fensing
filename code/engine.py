@@ -34,6 +34,10 @@ from anpr import ANPREngine
 from fence import VirtualFenceManager
 from tamper import CameraTamperDetector
 from ledger import append_event, file_sha256
+try:
+    import frs as frslib
+except Exception:
+    frslib = None
 
 # ---------------- CONFIG ----------------
 MODEL_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "models", "yolov8n.pt"))
@@ -43,9 +47,9 @@ EVENTS_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "data", "events.json
 # ⭐ A6: 5 Recognized Vehicle Classes (all others ignored for vehicle events)
 VEHICLE_CLASSES = ["car", "truck", "bus", "motorcycle", "bicycle"]
 
-TARGET_ANALYSIS_FPS = 6.0    # CPU-safe (Mac GPU chahiye to IBVAP_DEVICE=mps)
+TARGET_ANALYSIS_FPS = 5.0    # CPU-safe (Mac GPU chahiye to IBVAP_DEVICE=mps)
 CONF_THRESH = 0.35
-IMGSZ       = 512            # 320=fast, 512=balanced, 640=accurate
+IMGSZ       = 416            # 320=fast, 416=balanced, 640=accurate
 TRAIL_LEN   = 40             # v0.6 style 40-pt trails
 DEVICE      = os.environ.get("IBVAP_DEVICE", "cpu")
 FAKE_NIGHT_FACTOR = 0.22     # 'n' dabane pe frame is factor se dark hoga
@@ -212,7 +216,7 @@ def build_contract(stream_name, tracks, now, ana_fps, zone_events=None, tamper_s
 # ---------------- DRAWING ----------------
 def draw(frame, tracks, state, stream_name, cap_fps, connected, ana_fps,
          night=False, motion=None, plates=None, zone_events=None,
-         fence_manager=None, show_zones=True, tamper_status=None):
+         fence_manager=None, show_zones=True, tamper_status=None, faces=None):
 
     # 1. Render Virtual Zones if enabled
     if show_zones and fence_manager is not None:
@@ -231,9 +235,9 @@ def draw(frame, tracks, state, stream_name, cap_fps, connected, ana_fps,
         if tid in crit_tracks:
             color = (0, 0, 255)  # Red
             if crit_tracks[tid].get("posture") == "CRAWLING_PRONE":
-                tag += " [CRAWL 🚨]"
+                tag += " [CRAWL !]"
             else:
-                tag += " [BREACH 🚨]"
+                tag += " [BREACH !]"
         elif tid in warn_tracks:
             color = (0, 200, 255)  # Yellow
 
@@ -255,32 +259,60 @@ def draw(frame, tracks, state, stream_name, cap_fps, connected, ana_fps,
             is_valid = p.get("valid", False)
             box_color = (0, 0, 255) if is_hotlist else ((0, 255, 0) if is_valid else (0, 215, 255))
             cv2.rectangle(frame, (x1, y1), (x2, y2), box_color, 2)
-            badge = f"⚠️ HOTLIST: {plate}" if is_hotlist else f"{plate} ({p.get('state_code', 'IN')})"
+            badge = f"[!] HOTLIST: {plate}" if is_hotlist else f"{plate} ({p.get('state_code', 'IN')})"
             font = cv2.FONT_HERSHEY_SIMPLEX
             (tw, th), _ = cv2.getTextSize(badge, font, 0.5, 2)
             cv2.rectangle(frame, (x1, max(0, y1 - th - 8)), (x1 + tw + 8, y1), box_color, -1)
             cv2.putText(frame, badge, (x1 + 4, y1 - 4), font, 0.5, (255, 255, 255) if is_hotlist else (0, 0, 0), 2)
 
-    # 4. MOG2 Motion
+    # 4. Biometric Face Recognition Overlay (CAM-05)
+    if faces:
+        for f in faces:
+            bx, by, bw, bh = f["box"]
+            fname = f.get("name", "Unknown")
+            fscore = f.get("score", 0.0)
+            is_bolo = f.get("bolo", False)
+            fcolor = (0, 0, 255) if is_bolo else (0, 255, 120)
+            cv2.rectangle(frame, (bx, by), (bx + bw, by + bh), fcolor, 2)
+
+            badge = f"[!] BOLO MATCH: {fname[:18]} ({int(fscore*100)}%)" if is_bolo else f"FACE: {fname} ({int(fscore*100)}%)"
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            (tw, th), _ = cv2.getTextSize(badge, font, 0.46, 2)
+            cv2.rectangle(frame, (bx, max(0, by - th - 8)), (bx + tw + 8, by), fcolor, -1)
+            cv2.putText(frame, badge, (bx + 4, by - 4), font, 0.46, (255, 255, 255) if is_bolo else (0, 0, 0), 2)
+
+            if is_bolo:
+                cv2.rectangle(frame, (0, frame.shape[0] - 32), (frame.shape[1], frame.shape[0]), (0, 0, 200), -1)
+                cv2.putText(frame, f"[!] CRITICAL BIOMETRIC ALERT: Watchlist Match - {fname}", (15, frame.shape[0] - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 2)
+
+    # 5. FLIR Thermal LWIR Telemetry Overlay (CAM-04)
+    if "CAM-04" in stream_name:
+        cv2.putText(frame, "FLIR SC6000 LWIR 8-14um | PALETTE: INFERNO", (frame.shape[1] - 380, 28),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 220, 255), 2)
+        cv2.putText(frame, "STANDOFF HEAT EMISSIVITY: 0.98", (frame.shape[1] - 300, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 180, 240), 1)
+
+    # 6. MOG2 Motion
     if night and motion:
         for (x1, y1, x2, y2) in motion:
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 165, 255), 2)
             cv2.putText(frame, "MOTION", (x1, max(y1 - 6, 14)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
 
-    # 5. Night badge
+    # 7. Night badge
     if night:
-        cv2.putText(frame, "🌙 NIGHT MODE", (frame.shape[1] // 2 - 90, 30),
+        cv2.putText(frame, "[NIGHT MODE]", (frame.shape[1] // 2 - 80, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
 
-    # 6. Tamper Sabotage Banner
+    # 8. Tamper Sabotage Banner
     if tamper_status and tamper_status.get("tampered", False):
-        t_msg = f"⚠️ {tamper_status['message']}"
+        t_msg = f"[!] {tamper_status['message']}"
         cv2.rectangle(frame, (0, frame.shape[0] - 45), (frame.shape[1], frame.shape[0]), (0, 0, 220), -1)
         cv2.putText(frame, t_msg, (15, frame.shape[0] - 15),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
 
-    # 7. Status HUD
+    # 9. Status HUD
     hud_col = (0, 255, 0) if connected else (0, 0, 255)
     cv2.putText(frame, f'{stream_name} | {"LIVE" if connected else "DOWN"} | '
                 f'{cap_fps} fps | AI {ana_fps} Hz',
@@ -289,106 +321,143 @@ def draw(frame, tracks, state, stream_name, cap_fps, connected, ana_fps,
 
 
 def build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist, simulated_tamper, show_zones, ana_fps):
-    """Composes all active streams and tactical telemetry HUD into a single 1280x720 2x2 Grid window."""
-    TW, TH = 640, 360
-    grid = np.zeros((TH * 2, TW * 2, 3), dtype=np.uint8)
+    """Composes 5 active tactical surveillance streams + 1 C2 Telemetry HUD into a unified 1440x720 6-Split Grid."""
+    TW, TH = 480, 360
+    grid = np.zeros((TH * 2, TW * 3, 3), dtype=np.uint8)
 
-    cams_by_tag = {}
+    cams = {}
     for cam_id, stream in mgr.streams.items():
         frame = annotated.get(cam_id)
         if frame is None:
             continue
         if "CAM-01" in stream.name:
-            cams_by_tag["CAM-01"] = frame
+            cams["CAM-01"] = frame
         elif "CAM-02" in stream.name:
-            cams_by_tag["CAM-02"] = frame
+            cams["CAM-02"] = frame
         elif "CAM-03" in stream.name:
-            cams_by_tag["CAM-03"] = frame
+            cams["CAM-03"] = frame
+        elif "CAM-04" in stream.name:
+            cams["CAM-04"] = frame
+        elif "CAM-05" in stream.name:
+            cams["CAM-05"] = frame
 
-    # 1. Top-Left: CAM-01 (People)
-    if "CAM-01" in cams_by_tag:
-        grid[0:TH, 0:TW] = cv2.resize(cams_by_tag["CAM-01"], (TW, TH))
+    # Row 1 (Top):
+    # Tile 1 (0, 0): CAM-01 (People & Perimeter)
+    if "CAM-01" in cams:
+        grid[0:TH, 0:TW] = cv2.resize(cams["CAM-01"], (TW, TH))
     else:
-        cv2.putText(grid, "CAM-01 (People) - INITIALIZING", (30, TH // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (180, 180, 180), 2)
+        cv2.putText(grid, "CAM-01 (People) - INITIALIZING", (20, TH // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (180, 180, 180), 1)
 
-    # 2. Top-Right: CAM-02 (Vehicles & ANPR)
-    if "CAM-02" in cams_by_tag:
-        grid[0:TH, TW:TW * 2] = cv2.resize(cams_by_tag["CAM-02"], (TW, TH))
+    # Tile 2 (1, 0): CAM-02 (Vehicles & ANPR)
+    if "CAM-02" in cams:
+        grid[0:TH, TW:TW * 2] = cv2.resize(cams["CAM-02"], (TW, TH))
     else:
-        cv2.putText(grid, "CAM-02 (Vehicles & ANPR) - INITIALIZING", (TW + 30, TH // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (180, 180, 180), 2)
+        cv2.putText(grid, "CAM-02 (Vehicles & ANPR) - INITIALIZING", (TW + 20, TH // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (180, 180, 180), 1)
 
-    # 3. Bottom-Left: CAM-03 (Night CCTV)
-    if "CAM-03" in cams_by_tag:
-        grid[TH:TH * 2, 0:TW] = cv2.resize(cams_by_tag["CAM-03"], (TW, TH))
+    # Tile 3 (2, 0): CAM-03 (Night CCTV)
+    if "CAM-03" in cams:
+        grid[0:TH, TW * 2:TW * 3] = cv2.resize(cams["CAM-03"], (TW, TH))
     else:
-        cv2.putText(grid, "CAM-03 (Night CCTV) - INITIALIZING", (30, TH + TH // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (180, 180, 180), 2)
+        cv2.putText(grid, "CAM-03 (Night CCTV) - INITIALIZING", (TW * 2 + 20, TH // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (180, 180, 180), 1)
 
-    # 4. Bottom-Right: Tactical Telemetry HUD
+    # Row 2 (Bottom):
+    # Tile 4 (0, 1): CAM-04 (Thermal FLIR)
+    if "CAM-04" in cams:
+        grid[TH:TH * 2, 0:TW] = cv2.resize(cams["CAM-04"], (TW, TH))
+    else:
+        cv2.putText(grid, "CAM-04 (Thermal FLIR) - INITIALIZING", (20, TH + TH // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (180, 180, 180), 1)
+
+    # Tile 5 (1, 1): CAM-05 (Face Recognition)
+    if "CAM-05" in cams:
+        grid[TH:TH * 2, TW:TW * 2] = cv2.resize(cams["CAM-05"], (TW, TH))
+    else:
+        cv2.putText(grid, "CAM-05 (Face Recognition) - INITIALIZING", (TW + 20, TH + TH // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (180, 180, 180), 1)
+
+    # Tile 6 (2, 1): Tactical C2 Telemetry & Control HUD
     hud = np.zeros((TH, TW, 3), dtype=np.uint8)
-    hud[:] = (12, 16, 26)  # Tactical dark slate
+    hud[:] = (12, 16, 26)  # Tactical slate background
     cv2.rectangle(hud, (2, 2), (TW - 2, TH - 2), (40, 60, 90), 1)
 
     # Header
-    cv2.rectangle(hud, (0, 0), (TW, 36), (20, 32, 52), -1)
-    cv2.putText(hud, "IBVAP - TACTICAL C2 COMMAND GRID", (15, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (0, 240, 255), 2)
-    cv2.putText(hud, f"AI {ana_fps:.1f} Hz", (TW - 105, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (0, 255, 150), 2)
+    cv2.rectangle(hud, (0, 0), (TW, 34), (20, 32, 54), -1)
+    cv2.putText(hud, "IBVAP - 6-SPLIT TACTICAL C2", (15, 23), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 240, 255), 2)
+    cv2.putText(hud, f"AI {ana_fps:.1f} Hz", (TW - 95, 23), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 255, 150), 2)
 
-    # Active Stats
-    y = 62
+    y = 56
     c_p = contracts.get("CAM-01 (People)", {})
     c_v = contracts.get("CAM-02 (Vehicles & ANPR)", {})
     c_n = contracts.get("CAM-03 (Night CCTV)", {})
+    c_t = contracts.get("CAM-04 (Thermal FLIR)", {})
+    c_f = contracts.get("CAM-05 (Face Recognition)", {})
 
+    # Sector Telemetry
     p_trks = len(c_p.get("tracks", []))
     p_threat = c_p.get("threat_level", "NORMAL")
     p_col = (0, 0, 255) if p_threat == "CRITICAL" else ((0, 200, 255) if p_threat == "WARNING" else (0, 255, 0))
-    cv2.putText(hud, f"CAM-01 (People): {p_trks} Active | Threat: {p_threat}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.46, p_col, 1)
-    y += 24
+    cv2.putText(hud, f"CAM-01 [People]  : {p_trks} Trk | Threat: {p_threat}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.42, p_col, 1)
+    y += 20
 
     v_dict = c_v.get("vehicles", {})
     v_cnt = sum(v_dict.values())
     plates = c_v.get("plates", [])
-    p_str = ", ".join(p.get("plate", "") for p in plates[:2]) or "Scanning..."
-    v_threat = c_v.get("threat_level", "NORMAL")
-    v_col = (0, 0, 255) if v_threat == "CRITICAL" else (0, 220, 255)
-    cv2.putText(hud, f"CAM-02 (Vehicles): {v_cnt} Active ({v_dict.get('car', 0)} car, {v_dict.get('truck', 0)} trk)", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.46, v_col, 1)
-    y += 22
-    cv2.putText(hud, f"   ANPR OCR: {p_str}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (180, 240, 180), 1)
-    y += 26
+    p_str = plates[0]["plate"] if plates else "Scanning..."
+    cv2.putText(hud, f"CAM-02 [Vehicles]: {v_cnt} Veh | Plate: {p_str}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 220, 255), 1)
+    y += 20
 
     n_lux = c_n.get("tamper", {}).get("metrics", {}).get("mean_lux", 20.0)
-    cv2.putText(hud, f"CAM-03 (Night): MOONLIGHT 🌙 ACTIVE (Lux: {n_lux:.1f})", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.46, (255, 180, 50), 1)
-    y += 22
-    cv2.putText(hud, f"   Dual-Path: CLAHE Enhanced + MOG2 Motion", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (200, 200, 200), 1)
-    y += 26
+    cv2.putText(hud, f"CAM-03 [Night IR]: MOONLIGHT (Lux {n_lux:.0f}) | CLAHE", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 180, 50), 1)
+    y += 20
+
+    t_trks = len(c_t.get("tracks", []))
+    cv2.putText(hud, f"CAM-04 [Thermal] : FLIR LWIR 8-14um | {t_trks} Heat Trk", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 200, 255), 1)
+    y += 20
+
+    f_faces = c_f.get("faces", [])
+    f_str = f_faces[0]["name"][:20] if f_faces else "Watchlist Scan"
+    f_threat = c_f.get("threat_level", "NORMAL")
+    f_col = (0, 0, 255) if f_threat == "CRITICAL" else (0, 255, 120)
+    cv2.putText(hud, f"CAM-05 [Biometric]: YuNet FRS | {f_str}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.42, f_col, 1)
+    y += 24
 
     cv2.line(hud, (15, y), (TW - 15, y), (45, 60, 85), 1)
-    y += 22
+    y += 18
 
-    fn_status = "2AM DARK (CLAHE ON)" if fake_night else "NORMAL"
-    fn_col = (0, 150, 255) if fake_night else (160, 160, 160)
-    cv2.putText(hud, f"[N] Fake Night Sim : {fn_status}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.44, fn_col, 1)
-    y += 22
+    # System Defense & Shortcuts
+    fn_status = "2AM DARK (ON)" if fake_night else "NORMAL"
+    cv2.putText(hud, f"[N] Fake Night Sim : {fn_status}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (0, 160, 255) if fake_night else (160, 160, 160), 1)
+    y += 18
 
-    ht_status = "HR26DQ5551 INJECTED 🚨" if simulated_hotlist else "STANDBY"
-    ht_col = (0, 0, 255) if simulated_hotlist else (160, 160, 160)
-    cv2.putText(hud, f"[H] Hotlist Suspect: {ht_status}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.44, ht_col, 1)
-    y += 22
+    ht_status = "HR26DQ5551 [!]" if simulated_hotlist else "STANDBY"
+    cv2.putText(hud, f"[H] Hotlist BOLO    : {ht_status}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (0, 0, 255) if simulated_hotlist else (160, 160, 160), 1)
+    y += 18
 
-    tp_status = "LENS BLINDED / TAMPER 🚨" if simulated_tamper else "SECURE (Normal)"
-    tp_col = (0, 0, 255) if simulated_tamper else (0, 255, 150)
-    cv2.putText(hud, f"[T] Tamper Sabotage: {tp_status}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.44, tp_col, 1)
-    y += 22
+    tp_status = "LENS BLINDED [!]" if simulated_tamper else "SECURE (Normal)"
+    cv2.putText(hud, f"[T] Tamper Sabotage: {tp_status}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (0, 0, 255) if simulated_tamper else (0, 255, 150), 1)
+    y += 18
+
+    # Cryptographic SHA-256 Evidence Ledger
+    try:
+        with open(os.path.join(ROOT_DIR, "data", "evidence_chain.jsonl"), "r") as ef:
+            l_lines = ef.readlines()
+            ledg_cnt = len(l_lines)
+            last_rec = json.loads(l_lines[-1]) if l_lines else {}
+            head_hash = last_rec.get("block_hash", "GENESIS")[:10] + ".."
+    except Exception:
+        ledg_cnt, head_hash = 0, "SECURE"
+    cv2.putText(hud, f"Ledger: {ledg_cnt} Sealed | Head: {head_hash}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (160, 190, 220), 1)
+    y += 18
 
     zn_status = "ACTIVE" if show_zones else "HIDDEN"
-    cv2.putText(hud, f"[Z] Zones: {zn_status} | [G] Toggle Grid | [Q] Quit", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (0, 200, 255), 1)
+    cv2.putText(hud, f"[Z] Zones: {zn_status}  |  [G] Grid  |  [Q] Quit", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (0, 200, 255), 1)
 
-    grid[TH:TH * 2, TW:TW * 2] = hud
+    grid[TH:TH * 2, TW * 2:TW * 3] = hud
 
-    # Border lines separating tiles
-    cv2.line(grid, (0, TH), (TW * 2, TH), (0, 220, 255), 2)
+    # Grid dividing lines
+    cv2.line(grid, (0, TH), (TW * 3, TH), (0, 220, 255), 2)
     cv2.line(grid, (TW, 0), (TW, TH * 2), (0, 220, 255), 2)
+    cv2.line(grid, (TW * 2, 0), (TW * 2, TH * 2), (0, 220, 255), 2)
     return grid
+
 
 
 # ---------------- MAIN ----------------
@@ -403,12 +472,10 @@ def main():
     SOURCES = [
         {"src": os.path.join(VIDEO_DIR, "people-detection.mp4"), "name": "CAM-01 (People)"},
         {"src": cam2_src, "name": "CAM-02 (Vehicles & ANPR)"},
+        {"src": os.path.join(VIDEO_DIR, "night-surveillance.mp4"), "name": "CAM-03 (Night CCTV)"},
+        {"src": os.path.join(VIDEO_DIR, "thermal-ir-surveillance.mp4"), "name": "CAM-04 (Thermal FLIR)"},
+        {"src": os.path.join(VIDEO_DIR, "face-checkpoint.mp4"), "name": "CAM-05 (Face Recognition)"},
     ]
-
-    # Optional: agar night-surveillance video ho to CAM-03 bhi add kar sakte hain
-    night_vid = os.path.join(VIDEO_DIR, "night-surveillance.mp4")
-    if os.path.exists(night_vid):
-        SOURCES.append({"src": night_vid, "name": "CAM-03 (Night CCTV)"})
 
     missing = [s["src"] for s in SOURCES if not os.path.exists(s["src"])]
     if missing:
@@ -434,6 +501,9 @@ def main():
     fence_manager = VirtualFenceManager()
     tamper_detectors = {cam_id: CameraTamperDetector(mgr.streams[cam_id].name) for cam_id in mgr.streams}
 
+    # ⭐ Choke-Point Biometric Face Recognition Watchlist
+    face_gallery = frslib.load_gallery() if frslib else {}
+
     fake_night = False
     simulated_hotlist = False
     simulated_tamper = False
@@ -444,6 +514,13 @@ def main():
     contracts = {}
     breach_cooldown = {}
 
+    if not headless:
+        try:
+            cv2.namedWindow("IBVAP Tactical Multi-Camera Command Grid (6-Split)", cv2.WINDOW_NORMAL)
+            cv2.resizeWindow("IBVAP Tactical Multi-Camera Command Grid (6-Split)", 1440, 720)
+        except Exception:
+            pass
+
     print("=" * 65)
     print("  IBVAP — Tactical Border Intelligence & Perception Platform")
     print("=" * 65)
@@ -451,6 +528,7 @@ def main():
     print(f"Active Cameras: {[s['name'] for s in SOURCES]}")
     print(f"Events Ledger : {EVENTS_PATH}")
     print(f"Hotlist Watch : {len(anpr_engine.hotlist)} suspect vehicles loaded")
+    print(f"Biometric FRS : {len(face_gallery)} suspects on BOLO watchlist")
     print("Controls HUD  : 'q'=quit | 'n'=fake night | 'h'=hotlist | 't'=tamper | 'z'=zones | 'g'=grid")
     print("=" * 65)
 
@@ -487,76 +565,135 @@ def main():
                     # Dual-path night processing (brightness gate + CLAHE enhance + MOG2 motion)
                     nr = night_engines[cam_id].process(frame)
 
-                    # YOLO ko ENHANCED frame do (night me CLAHE wala)
-                    result = models[cam_id].track(
-                        nr["enhanced"], persist=True, conf=CONF_THRESH,
-                        imgsz=IMGSZ, device=DEVICE, verbose=False)[0]
+                    faces_data = []
+                    plates = []
+                    zone_events = []
 
-                    tracks = extract_tracks(result, states[cam_id], now)
-                    states[cam_id].gc(now)
-
-                    # ⭐ Virtual Fence Intrusion & Posture Evaluation (Upright / Crawling)
-                    zone_events = fence_manager.evaluate_tracks(st["name"], tracks, frame.shape, now)
-                    for ze in zone_events:
-                        if ze["severity"] == "CRITICAL":
-                            b_key = (st["name"], ze["track_id"], ze["zone_id"])
-                            if now - breach_cooldown.get(b_key, 0) > 6.0:
-                                breach_cooldown[b_key] = now
-                                print(f"🚨 PERIMETER BREACH [{st['name']}]: {ze['event_type']} - "
-                                      f"{ze['cls']}#{ze['track_id']} in {ze['zone_name']} (Posture: {ze['posture']})")
-                                try:
-                                    snap_name = f"breach_{ze['track_id']}_{int(now*1000)}.jpg"
-                                    snap_path = os.path.join(ROOT_DIR, "data", "snapshots", snap_name)
-                                    cv2.imwrite(snap_path, frame)
-                                    snap_hash = file_sha256(snap_path)
-                                    append_event({
-                                        "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)),
-                                        "event": ze["event_type"],
-                                        "stream_id": st["name"],
-                                        "track_id": ze["track_id"],
-                                        "score": 95 if ze["posture"] == "CRAWLING_PRONE" else 85,
-                                        "severity": "CRITICAL",
-                                        "breakdown": {"zone": 50, "posture": 35 if ze["posture"] == "CRAWLING_PRONE" else 15},
-                                        "snapshot": snap_path,
-                                        "snapshot_sha256": snap_hash,
-                                        "location": [(ze["box"][0] + ze["box"][2]) // 2, (ze["box"][1] + ze["box"][3]) // 2],
+                    if "CAM-05" in st["name"]:
+                        # ⭐ CAM-05: Choke-Point Biometric Face Recognition (YuNet + SFace)
+                        tracks = []
+                        if frslib:
+                            f_boxes = frslib.detect_faces(frame)
+                            if f_boxes:
+                                m_results = frslib.match_faces(frame, f_boxes, gallery=face_gallery)
+                                for idx_f, ((bx, by, bw, bh), m_name, m_score) in enumerate(m_results):
+                                    is_bolo = bool(m_name and "BOLO" in m_name)
+                                    faces_data.append({
+                                        "box": [bx, by, bw, bh],
+                                        "name": m_name or "Unknown",
+                                        "score": round(float(m_score), 2),
+                                        "bolo": is_bolo
                                     })
-                                except Exception as e:
-                                    print(f"⚠️ Breach ledger append failed: {e}")
+                                    speed, age = states[cam_id].update(900 + idx_f, bx + bw // 2, by + bh // 2, now)
+                                    tracks.append({
+                                        "tid": 900 + idx_f, "cls": "person", "conf": round(float(m_score), 2),
+                                        "box": [bx, by, bx + bw, by + bh], "age": round(age, 1), "speed": round(speed, 1)
+                                    })
+                                    if is_bolo:
+                                        b_key = ("CAM-05", m_name)
+                                        if now - breach_cooldown.get(b_key, 0) > 8.0:
+                                            breach_cooldown[b_key] = now
+                                            print(f"🚨 CRITICAL BIOMETRIC ALERT [{st['name']}]: Watchlist Suspect: {m_name} ({m_score*100:.1f}%)")
+                                            try:
+                                                snap_name = f"face_bolo_{int(now*1000)}.jpg"
+                                                snap_path = os.path.join(ROOT_DIR, "data", "snapshots", snap_name)
+                                                cv2.imwrite(snap_path, frame)
+                                                snap_hash = file_sha256(snap_path)
+                                                append_event({
+                                                    "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)),
+                                                    "event": "WATCHLIST_FACE_MATCH",
+                                                    "stream_id": st["name"],
+                                                    "track_id": 900 + idx_f,
+                                                    "score": 98,
+                                                    "severity": "CRITICAL",
+                                                    "breakdown": {"biometric_confidence": round(float(m_score)*100, 1), "watchlist_match": 100},
+                                                    "snapshot": snap_path,
+                                                    "snapshot_sha256": snap_hash,
+                                                    "location": [bx + bw // 2, by + bh // 2],
+                                                })
+                                            except Exception as e:
+                                                print(f"⚠️ Face ledger append failed: {e}")
+                        states[cam_id].gc(now)
+                        zone_events = fence_manager.evaluate_tracks(st["name"], tracks, frame.shape, now)
+                    else:
+                        # YOLOv8n inference on enhanced frame (CAM-01, CAM-02, CAM-03, CAM-04)
+                        result = models[cam_id].track(
+                            nr["enhanced"], persist=True, conf=CONF_THRESH,
+                            imgsz=IMGSZ, device=DEVICE, verbose=False)[0]
 
-                    # ⭐ A5: ANPR Detection on vehicles
-                    has_vehicles = any(t["cls"] in VEHICLE_CLASSES for t in tracks)
-                    plates = anpr_engine.process_frame(frame) if has_vehicles else []
+                        tracks = extract_tracks(result, states[cam_id], now)
+                        states[cam_id].gc(now)
 
-                    # Test simulation hotlist injection on CAM-02
-                    if simulated_hotlist and "CAM-02" in st["name"] and not plates:
-                        h, w = frame.shape[:2]
-                        plates.append({
-                            "plate": "HR26DQ5551", "raw_text": "HR26DQ5551", "valid": True,
-                            "state_code": "HR", "state": "Haryana", "hotlist": True,
-                            "hotlist_info": anpr_engine.hotlist.get("HR26DQ5551", {"reason": "NARCOTICS_SMUGGLING_SUSPECT"}),
-                            "conf": 0.94, "box": [w // 2 - 80, h // 2 - 20, w // 2 + 80, h // 2 + 20]
-                        })
+                        # Virtual fence evaluation
+                        zone_events = fence_manager.evaluate_tracks(st["name"], tracks, frame.shape, now)
+                        for ze in zone_events:
+                            if ze["severity"] == "CRITICAL":
+                                b_key = (st["name"], ze["track_id"], ze["zone_id"])
+                                if now - breach_cooldown.get(b_key, 0) > 6.0:
+                                    breach_cooldown[b_key] = now
+                                    print(f"🚨 PERIMETER BREACH [{st['name']}]: {ze['event_type']} - "
+                                          f"{ze['cls']}#{ze['track_id']} in {ze['zone_name']} (Posture: {ze['posture']})")
+                                    try:
+                                        snap_name = f"breach_{ze['track_id']}_{int(now*1000)}.jpg"
+                                        snap_path = os.path.join(ROOT_DIR, "data", "snapshots", snap_name)
+                                        cv2.imwrite(snap_path, frame)
+                                        snap_hash = file_sha256(snap_path)
+                                        append_event({
+                                            "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)),
+                                            "event": ze["event_type"],
+                                            "stream_id": st["name"],
+                                            "track_id": ze["track_id"],
+                                            "score": 95 if ze["posture"] == "CRAWLING_PRONE" else 85,
+                                            "severity": "CRITICAL",
+                                            "breakdown": {"zone": 50, "posture": 35 if ze["posture"] == "CRAWLING_PRONE" else 15},
+                                            "snapshot": snap_path,
+                                            "snapshot_sha256": snap_hash,
+                                            "location": [(ze["box"][0] + ze["box"][2]) // 2, (ze["box"][1] + ze["box"][3]) // 2],
+                                        })
+                                    except Exception as e:
+                                        print(f"⚠️ Breach ledger append failed: {e}")
 
-                    # ⭐ A6: Vehicle Classification Events (Deduplicated per track_id, with snapshots + ledger seal)
-                    log_vehicle_events(tracks, states[cam_id], st["name"], now, EVENTS_PATH, frame=frame, plates=plates)
+                        # ANPR for vehicles (CAM-02)
+                        has_vehicles = any(t["cls"] in VEHICLE_CLASSES for t in tracks)
+                        plates = anpr_engine.process_frame(frame) if has_vehicles else []
+
+                        # Test simulation hotlist injection on CAM-02
+                        if simulated_hotlist and "CAM-02" in st["name"] and not plates:
+                            h, w = frame.shape[:2]
+                            plates.append({
+                                "plate": "HR26DQ5551", "raw_text": "HR26DQ5551", "valid": True,
+                                "state_code": "HR", "state": "Haryana", "hotlist": True,
+                                "hotlist_info": anpr_engine.hotlist.get("HR26DQ5551", {"reason": "NARCOTICS_SMUGGLING_SUSPECT"}),
+                                "conf": 0.94, "box": [w // 2 - 80, h // 2 - 20, w // 2 + 80, h // 2 + 20]
+                            })
+
+                        # Vehicle classification events
+                        log_vehicle_events(tracks, states[cam_id], st["name"], now, EVENTS_PATH, frame=frame, plates=plates)
 
                     c = build_contract(st["name"], tracks, now, TARGET_ANALYSIS_FPS,
                                        zone_events=zone_events, tamper_status=tamper_status)
                     c["night"] = nr["night"]           # real boolean
                     c["motion"] = nr["motion"]         # safety-net boxes
                     c["plates"] = plates               # ⭐ A5: Populated ANPR plates!
+                    c["faces"] = faces_data            # ⭐ Biometric FRS faces!
+                    if faces_data and any(f.get("bolo") for f in faces_data):
+                        c["threat_level"] = "CRITICAL"
 
                     annotated[cam_id] = draw(
                         frame.copy(), tracks, states[cam_id], st["name"],
                         st["fps"], st["connected"], TARGET_ANALYSIS_FPS,
                         night=nr["night"], motion=nr["motion"], plates=plates,
                         zone_events=zone_events, fence_manager=fence_manager,
-                        show_zones=show_zones, tamper_status=tamper_status)
+                        show_zones=show_zones, tamper_status=tamper_status, faces=faces_data)
 
                     # Save live preview image for dashboard cards
                     try:
-                        tag = "cam1" if "CAM-01" in st["name"] else ("cam2" if "CAM-02" in st["name"] else "cam3")
+                        if "CAM-01" in st["name"]: tag = "cam1"
+                        elif "CAM-02" in st["name"]: tag = "cam2"
+                        elif "CAM-03" in st["name"]: tag = "cam3"
+                        elif "CAM-04" in st["name"]: tag = "cam4"
+                        elif "CAM-05" in st["name"]: tag = "cam5"
+                        else: tag = "cam1"
                         live_snap = os.path.join(ROOT_DIR, "data", "snapshots", f"{tag}_live.jpg")
                         cv2.imwrite(live_snap, annotated[cam_id])
                         c["snapshot_url"] = f"/snapshots/{tag}_live.jpg"
@@ -579,7 +716,7 @@ def main():
                 curr_fps = tick_count / max(now - print_t0, 1e-3)
                 if use_grid:
                     grid = build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist, simulated_tamper, show_zones, curr_fps)
-                    cv2.imshow("IBVAP Tactical Multi-Camera Command Grid", grid)
+                    cv2.imshow("IBVAP Tactical Multi-Camera Command Grid (6-Split)", grid)
                 else:
                     for cam_id, stream in mgr.streams.items():
                         if annotated[cam_id] is not None:
@@ -624,7 +761,7 @@ def main():
                 elif key == ord('g'):
                     use_grid = not use_grid
                     cv2.destroyAllWindows()
-                    print(f"🖥️ DISPLAY MODE: {'Unified 2x2 Tactical Grid' if use_grid else 'Individual Windows'}")
+                    print(f"🖥️ DISPLAY MODE: {'Unified 6-Split Tactical Grid' if use_grid else 'Individual Windows'}")
             else:
                 time.sleep(0.005)
     except KeyboardInterrupt:

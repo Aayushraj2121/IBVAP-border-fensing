@@ -297,6 +297,20 @@ footer .g{color:var(--green)} footer .r{color:var(--red)}
     </div>
     <div class="cam-body">Initializing edge feed…</div>
   </div>
+  <div class="cam-card">
+    <div class="cam-head">
+      <span class="cam-title">CAM-04 (Thermal FLIR)</span>
+      <span class="cam-badge NORMAL">NORMAL</span>
+    </div>
+    <div class="cam-body">Initializing edge feed…</div>
+  </div>
+  <div class="cam-card">
+    <div class="cam-head">
+      <span class="cam-title">CAM-05 (Face Recognition)</span>
+      <span class="cam-badge NORMAL">NORMAL</span>
+    </div>
+    <div class="cam-body">Initializing edge feed…</div>
+  </div>
 </div>
 
 <!-- 2D Tactical BOP Mini-Map -->
@@ -332,19 +346,29 @@ footer .g{color:var(--green)} footer .r{color:var(--red)}
       <text x="478" y="92" fill="#fbbf24" font-size="9" font-family="monospace">BOP GATE</text>
 
       <!-- CAM-01 FOV Cone (People / Left Outer) -->
-      <polygon id="cone-cam1" points="200,140 100,50 300,50" fill="#10b981" fill-opacity="0.15" stroke="#10b981" stroke-width="1"/>
-      <circle cx="200" cy="140" r="6" fill="#10b981" />
-      <text x="175" y="160" fill="#6ee7b7" font-size="10" font-family="monospace">CAM-01 (People)</text>
+      <polygon id="cone-cam1" points="150,140 70,50 230,50" fill="#10b981" fill-opacity="0.15" stroke="#10b981" stroke-width="1"/>
+      <circle cx="150" cy="140" r="5" fill="#10b981" />
+      <text x="115" y="160" fill="#6ee7b7" font-size="9" font-family="monospace">CAM-01 (People)</text>
+
+      <!-- CAM-04 FOV Cone (Thermal FLIR Standoff) -->
+      <polygon id="cone-cam4" points="330,140 250,50 410,50" fill="#06b6d4" fill-opacity="0.15" stroke="#06b6d4" stroke-width="1"/>
+      <circle cx="330" cy="140" r="5" fill="#06b6d4" />
+      <text x="290" y="160" fill="#67e8f9" font-size="9" font-family="monospace">CAM-04 (Thermal IR)</text>
 
       <!-- CAM-02 FOV Cone (Gate Checkpost / ANPR) -->
-      <polygon id="cone-cam2" points="500,150 420,70 580,70" fill="#38bdf8" fill-opacity="0.15" stroke="#38bdf8" stroke-width="1"/>
-      <circle cx="500" cy="150" r="6" fill="#38bdf8" />
-      <text x="455" y="172" fill="#7dd3fc" font-size="10" font-family="monospace">CAM-02 (ANPR Gate)</text>
+      <polygon id="cone-cam2" points="500,150 430,70 570,70" fill="#38bdf8" fill-opacity="0.15" stroke="#38bdf8" stroke-width="1"/>
+      <circle cx="500" cy="150" r="5" fill="#38bdf8" />
+      <text x="455" y="172" fill="#7dd3fc" font-size="9" font-family="monospace">CAM-02 (ANPR Gate)</text>
+
+      <!-- CAM-05 FOV Cone (Biometric Choke-Point) -->
+      <polygon id="cone-cam5" points="670,140 600,50 740,50" fill="#a855f7" fill-opacity="0.15" stroke="#a855f7" stroke-width="1"/>
+      <circle cx="670" cy="140" r="5" fill="#a855f7" />
+      <text x="630" y="160" fill="#d8b4fe" font-size="9" font-family="monospace">CAM-05 (FRS Watch)</text>
 
       <!-- CAM-03 FOV Cone (Night IR / Right Sector) -->
-      <polygon id="cone-cam3" points="800,140 700,50 900,50" fill="#818cf8" fill-opacity="0.15" stroke="#818cf8" stroke-width="1"/>
-      <circle cx="800" cy="140" r="6" fill="#818cf8" />
-      <text x="765" y="160" fill="#a5b4fc" font-size="10" font-family="monospace">CAM-03 (Night IR)</text>
+      <polygon id="cone-cam3" points="850,140 770,50 930,50" fill="#818cf8" fill-opacity="0.15" stroke="#818cf8" stroke-width="1"/>
+      <circle cx="850" cy="140" r="5" fill="#818cf8" />
+      <text x="815" y="160" fill="#a5b4fc" font-size="9" font-family="monospace">CAM-03 (Night IR)</text>
     </svg>
   </div>
 </div>
@@ -473,11 +497,25 @@ async function refresh(manual){
           }).join("") + `</div>`;
         }
 
+        let facesHtml = "";
+        const faces = (c.faces || []);
+        if(faces.length > 0){
+          facesHtml = `<div class="cam-plates">` + faces.map(f => {
+            return `<span class="plate-tag ${f.bolo ? 'hot' : ''}">👤 ${f.name} (${Math.round((f.score||0)*100)}%) ${f.bolo ? '🚨BOLO' : ''}</span>`;
+          }).join("") + `</div>`;
+        }
+
         const liveImg = c.snapshot_url 
           ? `<div style="position:relative;margin-bottom:8px;border-radius:6px;overflow:hidden;border:1px solid #1e293b;background:#050914;">
                <img src="${c.snapshot_url}?t=${Date.now()}" style="width:100%;height:140px;object-fit:cover;display:block;" onerror="this.style.display='none'">
              </div>` 
           : '';
+
+        const isThermal = camName.includes("CAM-04");
+        const isFRS = camName.includes("CAM-05");
+        let specTag = "";
+        if(isThermal) specTag = ` · <span style="color:#06b6d4;">FLIR LWIR 8-14µm</span>`;
+        if(isFRS) specTag = ` · <span style="color:#a855f7;">YuNet FRS Watch</span>`;
 
         return `<div class="cam-card ${threat}">
           <div class="cam-head">
@@ -486,10 +524,11 @@ async function refresh(manual){
           </div>
           <div class="cam-body">
             ${liveImg}
-            Status: <b>${night}</b> · AI <b>${c.fps || 6} Hz</b><br>
+            Status: <b>${night}</b> · AI <b>${c.fps || 5} Hz</b>${specTag}<br>
             Active Targets: <b>${tracksCount} tracks</b>${activeVeh > 0 ? ` (🚗 ${activeVeh} vehicles)` : ''}<br>
             ${c.zone_events && c.zone_events.length > 0 ? `Zone Status: <b style="color:#ef4444;">${c.zone_events[0].event_type} (${c.zone_events[0].posture})</b><br>` : 'Zone Status: <b>Clear</b><br>'}
             ${platesHtml}
+            ${facesHtml}
           </div>
         </div>`;
       }).join("");
@@ -498,6 +537,8 @@ async function refresh(manual){
       const cam1 = Object.values(eng).find(c => (c.stream_id||"").includes("CAM-01"));
       const cam2 = Object.values(eng).find(c => (c.stream_id||"").includes("CAM-02"));
       const cam3 = Object.values(eng).find(c => (c.stream_id||"").includes("CAM-03"));
+      const cam4 = Object.values(eng).find(c => (c.stream_id||"").includes("CAM-04"));
+      const cam5 = Object.values(eng).find(c => (c.stream_id||"").includes("CAM-05"));
 
       const updateCone = (id, cam) => {
         const el = $(id);
@@ -520,6 +561,8 @@ async function refresh(manual){
       updateCone("cone-cam1", cam1);
       updateCone("cone-cam2", cam2);
       updateCone("cone-cam3", cam3);
+      updateCone("cone-cam4", cam4);
+      updateCone("cone-cam5", cam5);
     }
 
     /* audio beep on new alerts */
