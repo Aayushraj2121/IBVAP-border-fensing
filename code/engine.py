@@ -33,6 +33,7 @@ from night import NightEngine
 from anpr import ANPREngine
 from fence import VirtualFenceManager
 from tamper import CameraTamperDetector
+from ledger import append_event, file_sha256
 
 # ---------------- CONFIG ----------------
 MODEL_PATH = os.path.normpath(os.path.join(BASE_DIR, "..", "models", "yolov8n.pt"))
@@ -109,11 +110,11 @@ def extract_tracks(result, state, now):
     return tracks
 
 
-def log_vehicle_events(tracks, state, stream_name, now, events_path):
+def log_vehicle_events(tracks, state, stream_name, now, events_path, frame=None, plates=None):
     """⭐ A6: Vehicle Classification Events.
     Fires ONCE per vehicle track_id on entry (deduplicated via state.logged_vehicles).
     Only logs recognized vehicle classes (car, truck, bus, motorcycle, bicycle).
-    Appends to data/events.jsonl and prints to console.
+    Appends to data/events.jsonl, seals cryptographic snapshot into evidence ledger, and prints to console.
     """
     for t in tracks:
         cls_name = t["cls"]
@@ -135,6 +136,35 @@ def log_vehicle_events(tracks, state, stream_name, now, events_path):
                         f.write(json.dumps(event) + "\n")
                 except Exception as e:
                     print(f"⚠️ Event logging failed: {e}")
+
+                # ⭐ Save evidence snapshot and seal onto cryptographic ledger for dashboard display
+                if frame is not None:
+                    try:
+                        snap_name = f"car_trk_{tid}_{int(now*1000)}.jpg"
+                        snap_path = os.path.join(ROOT_DIR, "data", "snapshots", snap_name)
+                        cv2.imwrite(snap_path, frame)
+                        snap_hash = file_sha256(snap_path)
+                        plate_val = plates[0]["plate"] if (plates and len(plates) > 0) else None
+                        is_bolo = plates[0].get("hotlist", False) if (plates and len(plates) > 0) else False
+
+                        ledger_rec = {
+                            "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)),
+                            "event": "HOTLIST_VEHICLE_BOLO" if is_bolo else f"VEHICLE_{cls_name.upper()}_DETECTED",
+                            "stream_id": stream_name,
+                            "track_id": tid,
+                            "score": 90 if is_bolo else 55,
+                            "severity": "CRITICAL" if is_bolo else "INFO",
+                            "breakdown": {"vehicle": 25, "speed": int(t.get("speed", 0)), "bolo": 50 if is_bolo else 0},
+                            "snapshot": snap_path,
+                            "snapshot_sha256": snap_hash,
+                            "location": [(t["box"][0] + t["box"][2]) // 2, (t["box"][1] + t["box"][3]) // 2],
+                            "speed_px_s": round(t.get("speed", 0), 1),
+                            "age_sec": round(t.get("age", 0), 1),
+                            "plate": plate_val,
+                        }
+                        append_event(ledger_rec)
+                    except Exception as e:
+                        print(f"⚠️ Ledger append failed for vehicle #{tid}: {e}")
 
                 print(f"🚗 EVENT: {cls_name}#{tid} entered {stream_name} (conf {t['conf']})")
 
@@ -474,9 +504,25 @@ def main():
                                 breach_cooldown[b_key] = now
                                 print(f"🚨 PERIMETER BREACH [{st['name']}]: {ze['event_type']} - "
                                       f"{ze['cls']}#{ze['track_id']} in {ze['zone_name']} (Posture: {ze['posture']})")
-
-                    # ⭐ A6: Vehicle Classification Events (Deduplicated per track_id)
-                    log_vehicle_events(tracks, states[cam_id], st["name"], now, EVENTS_PATH)
+                                try:
+                                    snap_name = f"breach_{ze['track_id']}_{int(now*1000)}.jpg"
+                                    snap_path = os.path.join(ROOT_DIR, "data", "snapshots", snap_name)
+                                    cv2.imwrite(snap_path, frame)
+                                    snap_hash = file_sha256(snap_path)
+                                    append_event({
+                                        "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now)),
+                                        "event": ze["event_type"],
+                                        "stream_id": st["name"],
+                                        "track_id": ze["track_id"],
+                                        "score": 95 if ze["posture"] == "CRAWLING_PRONE" else 85,
+                                        "severity": "CRITICAL",
+                                        "breakdown": {"zone": 50, "posture": 35 if ze["posture"] == "CRAWLING_PRONE" else 15},
+                                        "snapshot": snap_path,
+                                        "snapshot_sha256": snap_hash,
+                                        "location": [(ze["box"][0] + ze["box"][2]) // 2, (ze["box"][1] + ze["box"][3]) // 2],
+                                    })
+                                except Exception as e:
+                                    print(f"⚠️ Breach ledger append failed: {e}")
 
                     # ⭐ A5: ANPR Detection on vehicles
                     has_vehicles = any(t["cls"] in VEHICLE_CLASSES for t in tracks)
@@ -492,12 +538,14 @@ def main():
                             "conf": 0.94, "box": [w // 2 - 80, h // 2 - 20, w // 2 + 80, h // 2 + 20]
                         })
 
+                    # ⭐ A6: Vehicle Classification Events (Deduplicated per track_id, with snapshots + ledger seal)
+                    log_vehicle_events(tracks, states[cam_id], st["name"], now, EVENTS_PATH, frame=frame, plates=plates)
+
                     c = build_contract(st["name"], tracks, now, TARGET_ANALYSIS_FPS,
                                        zone_events=zone_events, tamper_status=tamper_status)
                     c["night"] = nr["night"]           # real boolean
                     c["motion"] = nr["motion"]         # safety-net boxes
                     c["plates"] = plates               # ⭐ A5: Populated ANPR plates!
-                    contracts[st["name"]] = c
 
                     annotated[cam_id] = draw(
                         frame.copy(), tracks, states[cam_id], st["name"],
@@ -505,6 +553,17 @@ def main():
                         night=nr["night"], motion=nr["motion"], plates=plates,
                         zone_events=zone_events, fence_manager=fence_manager,
                         show_zones=show_zones, tamper_status=tamper_status)
+
+                    # Save live preview image for dashboard cards
+                    try:
+                        tag = "cam1" if "CAM-01" in st["name"] else ("cam2" if "CAM-02" in st["name"] else "cam3")
+                        live_snap = os.path.join(ROOT_DIR, "data", "snapshots", f"{tag}_live.jpg")
+                        cv2.imwrite(live_snap, annotated[cam_id])
+                        c["snapshot_url"] = f"/snapshots/{tag}_live.jpg"
+                    except Exception:
+                        pass
+
+                    contracts[st["name"]] = c
 
                 # Member B ke liye atomic state dump (dashboard isse poll karega)
                 try:

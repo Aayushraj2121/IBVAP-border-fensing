@@ -473,12 +473,19 @@ async function refresh(manual){
           }).join("") + `</div>`;
         }
 
+        const liveImg = c.snapshot_url 
+          ? `<div style="position:relative;margin-bottom:8px;border-radius:6px;overflow:hidden;border:1px solid #1e293b;background:#050914;">
+               <img src="${c.snapshot_url}?t=${Date.now()}" style="width:100%;height:140px;object-fit:cover;display:block;" onerror="this.style.display='none'">
+             </div>` 
+          : '';
+
         return `<div class="cam-card ${threat}">
           <div class="cam-head">
             <span class="cam-title">${camName}</span>
             <div>${badges}</div>
           </div>
           <div class="cam-body">
+            ${liveImg}
             Status: <b>${night}</b> · AI <b>${c.fps || 6} Hz</b><br>
             Active Targets: <b>${tracksCount} tracks</b>${activeVeh > 0 ? ` (🚗 ${activeVeh} vehicles)` : ''}<br>
             ${c.zone_events && c.zone_events.length > 0 ? `Zone Status: <b style="color:#ef4444;">${c.zone_events[0].event_type} (${c.zone_events[0].posture})</b><br>` : 'Zone Status: <b>Clear</b><br>'}
@@ -540,6 +547,9 @@ async function refresh(manual){
       const img = a.snapshot_url
         ? `<img src="${a.snapshot_url}" loading="lazy" onerror="this.outerHTML='<div class=noimg>SNAPSHOT ARCHIVED</div>'">`
         : `<div class="noimg">NO SNAPSHOT</div>`;
+      const plateBadge = a.plate 
+        ? `<span style="font-size:11px;padding:2px 7px;border-radius:6px;background:#1e3a8a;color:#60a5fa;font-weight:700;font-family:monospace;border:1px solid #3b82f6;">🚗 ${a.plate}</span>` 
+        : '';
       return `<div class="card ${a.severity||''}">
         ${img}
         <div class="cbody">
@@ -547,7 +557,9 @@ async function refresh(manual){
             <span class="sev">${a.severity||"?"}</span>
             <span class="mono" style="font-size:12.5px;color:var(--txt);">${a.score||80} pts</span>
             <span style="font-size:10px;padding:2px 7px;border-radius:12px;border:1px solid #2b4a7a;color:#93c5fd;">TRACK #${a.track_id}</span>
+            ${plateBadge}
           </div>
+          <div style="font-size:12px;font-weight:700;color:var(--txt);margin:4px 0 2px 0;">${(a.event||"").replace(/_/g," ")}</div>
           <div class="chips">${chips}</div>
           <div class="meta">
             🕒 ${a.time||""} <b>(${ago(a.time)})</b> ·
@@ -559,6 +571,7 @@ async function refresh(manual){
         </div>
       </div>`;
     }).join("");
+
   }catch(e){ console.log(e); }
 }
 
