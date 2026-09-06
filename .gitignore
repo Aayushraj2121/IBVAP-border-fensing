@@ -33,8 +33,9 @@ Desktop.ini
 *.pt
 *.onnx
 *.engine
-models/*.pt
-models/*.onnx
+!models/face_detection_yunet_2023mar.onnx
+!models/face_recognition_sface_2021dec.onnx
+!models/yolov8n.pt
 
 # --- Large Media & Video Files ---
 *.mp4
@@ -42,6 +43,7 @@ models/*.onnx
 *.mov
 *.mkv
 *.webm
+!data/test_videos/*.mp4
 
 # --- Runtime Data, State & Logs ---
 data/engine_state.json*
