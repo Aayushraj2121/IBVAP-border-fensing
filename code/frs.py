@@ -55,13 +55,14 @@ def get_embedding(frame, box):
         best = min(faces, key=lambda f: abs(int(f[0]) - x) + abs(int(f[1]) - y))
         aligned = frame.copy()
         emb = rec.feature(aligned, best)
-        return emb
+        return emb.flatten()
     # fallback: crop-based embedding (less accurate)
     crop = frame[y:y+fh, x:x+fw]
     if crop.size == 0:
         return None
     crop = cv2.resize(crop, (112, 112))
-    return rec.feature(crop)
+    emb = rec.feature(crop)
+    return emb.flatten() if emb is not None else None
 
 def load_gallery():
     if os.path.exists(GALLERY_FILE):
@@ -103,11 +104,15 @@ def enroll():
     src = sys.argv[3] if len(sys.argv) > 3 else "0"
 
     if src.isdigit():
-        cap = cv2.VideoCapture(int(src) + 1, cv2.CAP_DSHOW)   # your real camera index
+        idx = int(src)
+        backend = cv2.CAP_DSHOW if sys.platform.startswith("win") else cv2.CAP_ANY
+        cap = cv2.VideoCapture(idx, backend)
+        if not cap.isOpened() and idx == 0 and sys.platform.startswith("win"):
+            cap = cv2.VideoCapture(1, backend)
     else:
         cap = cv2.VideoCapture(src)
     if not cap.isOpened():
-        print("ERROR: cannot open source"); sys.exit(1)
+        print("ERROR: cannot open source:", src); sys.exit(1)
 
     gallery = load_gallery()
     gallery.setdefault(name, [])
