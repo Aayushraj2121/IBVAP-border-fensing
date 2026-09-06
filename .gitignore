@@ -1,0 +1,13 @@
+﻿venv/
+__pycache__/
+*.mp4
+*.pt
+data/snapshots/
+demo/evidence_clips/
+evidence_chain.jsonl
+data/archive/
+evidence_chain*.jsonl
+models/plate_detector.pt
+*.pt
+data/anchor.txt
+data/alerts_log.jsonl
