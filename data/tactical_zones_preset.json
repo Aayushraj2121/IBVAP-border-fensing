@@ -1,0 +1,129 @@
+{
+  "CAM-01 (People)": [
+    {
+      "id": "CAM01-EXC-01",
+      "name": "Perimeter Exclusion Zone (Zero Tolerance)",
+      "type": "EXCLUSION_ZONE",
+      "severity": "CRITICAL",
+      "color": [0, 0, 240],
+      "points_norm": [
+        [0.45, 0.40],
+        [0.98, 0.40],
+        [0.98, 0.95],
+        [0.45, 0.95]
+      ]
+    },
+    {
+      "id": "CAM01-BUF-01",
+      "name": "Outer Approach Buffer (Warning)",
+      "type": "BUFFER_ZONE",
+      "severity": "WARNING",
+      "color": [0, 200, 255],
+      "points_norm": [
+        [0.10, 0.35],
+        [0.45, 0.35],
+        [0.45, 0.95],
+        [0.10, 0.95]
+      ]
+    }
+  ],
+  "CAM-02 (Vehicles & ANPR)": [
+    {
+      "id": "CAM02-CHK-01",
+      "name": "BOP Gate ANPR Choke-Point",
+      "type": "CHECKPOINT_ZONE",
+      "severity": "INFO",
+      "color": [255, 200, 0],
+      "points_norm": [
+        [0.05, 0.35],
+        [0.95, 0.35],
+        [0.95, 0.98],
+        [0.05, 0.98]
+      ]
+    },
+    {
+      "id": "CAM02-EXC-01",
+      "name": "Off-Limits Perimeter Verge",
+      "type": "EXCLUSION_ZONE",
+      "severity": "CRITICAL",
+      "color": [0, 0, 240],
+      "points_norm": [
+        [0.0, 0.05],
+        [1.0, 0.05],
+        [1.0, 0.28],
+        [0.0, 0.28]
+      ]
+    }
+  ],
+  "CAM-03 (Night CCTV)": [
+    {
+      "id": "CAM03-EXC-01",
+      "name": "Night IR Perimeter Fence (High Risk)",
+      "type": "EXCLUSION_ZONE",
+      "severity": "CRITICAL",
+      "color": [0, 0, 240],
+      "points_norm": [
+        [0.25, 0.30],
+        [0.80, 0.30],
+        [0.95, 0.95],
+        [0.15, 0.95]
+      ]
+    },
+    {
+      "id": "CAM03-BUF-01",
+      "name": "Night Approach Buffer",
+      "type": "BUFFER_ZONE",
+      "severity": "WARNING",
+      "color": [0, 215, 255],
+      "points_norm": [
+        [0.05, 0.20],
+        [0.95, 0.20],
+        [0.80, 0.30],
+        [0.25, 0.30]
+      ]
+    }
+  ],
+  "CAM-04 (Thermal FLIR)": [
+    {
+      "id": "CAM04-EXC-01",
+      "name": "Thermal High-Heat Standoff Sector",
+      "type": "EXCLUSION_ZONE",
+      "severity": "CRITICAL",
+      "color": [0, 0, 240],
+      "points_norm": [
+        [0.20, 0.25],
+        [0.85, 0.25],
+        [0.95, 0.95],
+        [0.10, 0.95]
+      ]
+    },
+    {
+      "id": "CAM04-BUF-01",
+      "name": "Thermal Outer Tripwire Alpha",
+      "type": "BUFFER_ZONE",
+      "severity": "WARNING",
+      "color": [0, 215, 255],
+      "points_norm": [
+        [0.05, 0.15],
+        [0.95, 0.15],
+        [0.85, 0.25],
+        [0.20, 0.25]
+      ]
+    }
+  ],
+  "CAM-05 (Face Recognition)": [
+    {
+      "id": "CAM05-CHK-01",
+      "name": "Biometric Identification Choke-Point",
+      "type": "CHECKPOINT_ZONE",
+      "severity": "INFO",
+      "color": [0, 255, 120],
+      "points_norm": [
+        [0.10, 0.10],
+        [0.90, 0.10],
+        [0.90, 0.95],
+        [0.10, 0.95]
+      ]
+    }
+  ]
+}

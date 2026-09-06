@@ -320,7 +320,7 @@ def draw(frame, tracks, state, stream_name, cap_fps, connected, ana_fps,
     return frame
 
 
-def build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist, simulated_tamper, show_zones, ana_fps):
+def build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist, simulated_tamper, show_zones, ana_fps, user_points=None, drawing_cam=None):
     """Composes 5 active tactical surveillance streams + 1 C2 Telemetry HUD into a unified 1440x720 6-Split Grid."""
     TW, TH = 480, 360
     grid = np.zeros((TH * 2, TW * 3, 3), dtype=np.uint8)
@@ -372,6 +372,32 @@ def build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist
         grid[TH:TH * 2, TW:TW * 2] = cv2.resize(cams["CAM-05"], (TW, TH))
     else:
         cv2.putText(grid, "CAM-05 (Face Recognition) - INITIALIZING", (TW + 20, TH + TH // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (180, 180, 180), 1)
+
+    # Interactive User-Drawn Fence Overlay
+    if user_points and drawing_cam:
+        tile_offsets = {
+            "CAM-01": (0, 0),
+            "CAM-02": (TW, 0),
+            "CAM-03": (TW * 2, 0),
+            "CAM-04": (0, TH),
+            "CAM-05": (TW, TH),
+        }
+        tox, toy = (0, 0)
+        for k, v in tile_offsets.items():
+            if k in drawing_cam:
+                tox, toy = v
+                break
+        pts_px = [(int(tox + p[0] * TW), int(toy + p[1] * TH)) for p in user_points]
+        for p in pts_px:
+            cv2.circle(grid, p, 5, (0, 255, 255), -1)
+            cv2.circle(grid, p, 7, (0, 0, 255), 1)
+        if len(pts_px) > 1:
+            for i in range(1, len(pts_px)):
+                cv2.line(grid, pts_px[i - 1], pts_px[i], (0, 255, 255), 2)
+            if len(pts_px) >= 3:
+                cv2.line(grid, pts_px[-1], pts_px[0], (0, 180, 255), 1)
+        cv2.putText(grid, f"DRAWING FENCE: {len(user_points)} pts | [C] ARM | [R] CLEAR",
+                    (tox + 10, toy + 28), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (0, 255, 255), 2)
 
     # Tile 6 (2, 1): Tactical C2 Telemetry & Control HUD
     hud = np.zeros((TH, TW, 3), dtype=np.uint8)
@@ -449,6 +475,9 @@ def build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist
 
     zn_status = "ACTIVE" if show_zones else "HIDDEN"
     cv2.putText(hud, f"[Z] Zones: {zn_status}  |  [G] Grid  |  [Q] Quit", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (0, 200, 255), 1)
+    y += 18
+
+    cv2.putText(hud, "Draw: Click on cam | [C] Arm | [R] Clear | [P] Preset", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 240, 255), 1)
 
     grid[TH:TH * 2, TW * 2:TW * 3] = hud
 
@@ -514,10 +543,39 @@ def main():
     contracts = {}
     breach_cooldown = {}
 
+    user_points = []
+    drawing_cam = None
+
+    WIN_NAME = "IBVAP Tactical Multi-Camera Command Grid (6-Split)"
+
+    def on_mouse(event, x, y, flags, param):
+        nonlocal user_points, drawing_cam
+        if event == cv2.EVENT_LBUTTONDOWN and use_grid:
+            TW, TH = 480, 360
+            col = x // TW
+            row = y // TH
+            cam_map = {
+                (0, 0): "CAM-01 (People)",
+                (1, 0): "CAM-02 (Vehicles & ANPR)",
+                (2, 0): "CAM-03 (Night CCTV)",
+                (0, 1): "CAM-04 (Thermal FLIR)",
+                (1, 1): "CAM-05 (Face Recognition)",
+            }
+            target = cam_map.get((col, row))
+            if target:
+                if drawing_cam != target:
+                    user_points = []
+                    drawing_cam = target
+                nx = max(0.0, min(1.0, (x - col * TW) / float(TW)))
+                ny = max(0.0, min(1.0, (y - row * TH) / float(TH)))
+                user_points.append([round(nx, 4), round(ny, 4)])
+                print(f"📍 Point #{len(user_points)} clicked on {target}: ({nx:.2f}, {ny:.2f}) -> Press [C] to ARM, [R] to CLEAR")
+
     if not headless:
         try:
-            cv2.namedWindow("IBVAP Tactical Multi-Camera Command Grid (6-Split)", cv2.WINDOW_NORMAL)
-            cv2.resizeWindow("IBVAP Tactical Multi-Camera Command Grid (6-Split)", 1440, 720)
+            cv2.namedWindow(WIN_NAME, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(WIN_NAME, 1440, 720)
+            cv2.setMouseCallback(WIN_NAME, on_mouse)
         except Exception:
             pass
 
@@ -530,6 +588,7 @@ def main():
     print(f"Hotlist Watch : {len(anpr_engine.hotlist)} suspect vehicles loaded")
     print(f"Biometric FRS : {len(face_gallery)} suspects on BOLO watchlist")
     print("Controls HUD  : 'q'=quit | 'n'=fake night | 'h'=hotlist | 't'=tamper | 'z'=zones | 'g'=grid")
+    print("Draw Fence    : Click any camera tile with mouse -> [C]=Arm fence | [R]=Clear | [P]=Reset preset")
     print("=" * 65)
 
     interval = 1.0 / TARGET_ANALYSIS_FPS
@@ -715,8 +774,10 @@ def main():
             if not headless:
                 curr_fps = tick_count / max(now - print_t0, 1e-3)
                 if use_grid:
-                    grid = build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist, simulated_tamper, show_zones, curr_fps)
-                    cv2.imshow("IBVAP Tactical Multi-Camera Command Grid (6-Split)", grid)
+                    grid = build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist,
+                                               simulated_tamper, show_zones, curr_fps,
+                                               user_points=user_points, drawing_cam=drawing_cam)
+                    cv2.imshow(WIN_NAME, grid)
                 else:
                     for cam_id, stream in mgr.streams.items():
                         if annotated[cam_id] is not None:
@@ -758,6 +819,47 @@ def main():
                 elif key == ord('z'):
                     show_zones = not show_zones
                     print(f"🛡️ VIRTUAL ZONES OVERLAY: {'ENABLED' if show_zones else 'DISABLED'}")
+                elif key == ord('c'):
+                    if len(user_points) >= 3 and drawing_cam:
+                        tz_path = os.path.join(ROOT_DIR, "data", "tactical_zones.json")
+                        try:
+                            with open(tz_path, "r") as f:
+                                all_zones = json.load(f)
+                        except Exception:
+                            all_zones = {}
+                        all_zones[drawing_cam] = [
+                            {
+                                "id": f"{drawing_cam[:5]}-CUSTOM-EXC",
+                                "name": f"Custom Exclusion Fence ({drawing_cam[:6]})",
+                                "type": "EXCLUSION_ZONE",
+                                "severity": "CRITICAL",
+                                "color": [0, 0, 240],
+                                "points_norm": list(user_points)
+                            }
+                        ]
+                        with open(tz_path, "w") as f:
+                            json.dump(all_zones, f, indent=2)
+                        fence_manager.reload()
+                        print(f"🛡️ Custom fence ARMED for {drawing_cam} with {len(user_points)} points! ✅")
+                        user_points = []
+                        drawing_cam = None
+                    else:
+                        print("⚠️ Click at least 3 points on a camera tile first with mouse, then press 'c' to arm.")
+                elif key == ord('r'):
+                    if user_points:
+                        user_points = []
+                        drawing_cam = None
+                        print("🔄 Cleared custom drawing points.")
+                    else:
+                        print("🔄 Ready to draw. Click any camera tile with mouse to draw a new fence.")
+                elif key == ord('p'):
+                    preset_p = os.path.join(ROOT_DIR, "data", "tactical_zones_preset.json")
+                    tz_path = os.path.join(ROOT_DIR, "data", "tactical_zones.json")
+                    if os.path.exists(preset_p):
+                        import shutil
+                        shutil.copy(preset_p, tz_path)
+                        fence_manager.reload()
+                        print("🔄 Standard Tactical Border Presets RESTORED! ✅")
                 elif key == ord('g'):
                     use_grid = not use_grid
                     cv2.destroyAllWindows()
