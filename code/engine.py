@@ -258,6 +258,109 @@ def draw(frame, tracks, state, stream_name, cap_fps, connected, ana_fps,
     return frame
 
 
+def build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist, simulated_tamper, show_zones, ana_fps):
+    """Composes all active streams and tactical telemetry HUD into a single 1280x720 2x2 Grid window."""
+    TW, TH = 640, 360
+    grid = np.zeros((TH * 2, TW * 2, 3), dtype=np.uint8)
+
+    cams_by_tag = {}
+    for cam_id, stream in mgr.streams.items():
+        frame = annotated.get(cam_id)
+        if frame is None:
+            continue
+        if "CAM-01" in stream.name:
+            cams_by_tag["CAM-01"] = frame
+        elif "CAM-02" in stream.name:
+            cams_by_tag["CAM-02"] = frame
+        elif "CAM-03" in stream.name:
+            cams_by_tag["CAM-03"] = frame
+
+    # 1. Top-Left: CAM-01 (People)
+    if "CAM-01" in cams_by_tag:
+        grid[0:TH, 0:TW] = cv2.resize(cams_by_tag["CAM-01"], (TW, TH))
+    else:
+        cv2.putText(grid, "CAM-01 (People) - INITIALIZING", (30, TH // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (180, 180, 180), 2)
+
+    # 2. Top-Right: CAM-02 (Vehicles & ANPR)
+    if "CAM-02" in cams_by_tag:
+        grid[0:TH, TW:TW * 2] = cv2.resize(cams_by_tag["CAM-02"], (TW, TH))
+    else:
+        cv2.putText(grid, "CAM-02 (Vehicles & ANPR) - INITIALIZING", (TW + 30, TH // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (180, 180, 180), 2)
+
+    # 3. Bottom-Left: CAM-03 (Night CCTV)
+    if "CAM-03" in cams_by_tag:
+        grid[TH:TH * 2, 0:TW] = cv2.resize(cams_by_tag["CAM-03"], (TW, TH))
+    else:
+        cv2.putText(grid, "CAM-03 (Night CCTV) - INITIALIZING", (30, TH + TH // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (180, 180, 180), 2)
+
+    # 4. Bottom-Right: Tactical Telemetry HUD
+    hud = np.zeros((TH, TW, 3), dtype=np.uint8)
+    hud[:] = (12, 16, 26)  # Tactical dark slate
+    cv2.rectangle(hud, (2, 2), (TW - 2, TH - 2), (40, 60, 90), 1)
+
+    # Header
+    cv2.rectangle(hud, (0, 0), (TW, 36), (20, 32, 52), -1)
+    cv2.putText(hud, "IBVAP - TACTICAL C2 COMMAND GRID", (15, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (0, 240, 255), 2)
+    cv2.putText(hud, f"AI {ana_fps:.1f} Hz", (TW - 105, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (0, 255, 150), 2)
+
+    # Active Stats
+    y = 62
+    c_p = contracts.get("CAM-01 (People)", {})
+    c_v = contracts.get("CAM-02 (Vehicles & ANPR)", {})
+    c_n = contracts.get("CAM-03 (Night CCTV)", {})
+
+    p_trks = len(c_p.get("tracks", []))
+    p_threat = c_p.get("threat_level", "NORMAL")
+    p_col = (0, 0, 255) if p_threat == "CRITICAL" else ((0, 200, 255) if p_threat == "WARNING" else (0, 255, 0))
+    cv2.putText(hud, f"CAM-01 (People): {p_trks} Active | Threat: {p_threat}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.46, p_col, 1)
+    y += 24
+
+    v_dict = c_v.get("vehicles", {})
+    v_cnt = sum(v_dict.values())
+    plates = c_v.get("plates", [])
+    p_str = ", ".join(p.get("plate", "") for p in plates[:2]) or "Scanning..."
+    v_threat = c_v.get("threat_level", "NORMAL")
+    v_col = (0, 0, 255) if v_threat == "CRITICAL" else (0, 220, 255)
+    cv2.putText(hud, f"CAM-02 (Vehicles): {v_cnt} Active ({v_dict.get('car', 0)} car, {v_dict.get('truck', 0)} trk)", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.46, v_col, 1)
+    y += 22
+    cv2.putText(hud, f"   ANPR OCR: {p_str}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (180, 240, 180), 1)
+    y += 26
+
+    n_lux = c_n.get("tamper", {}).get("metrics", {}).get("mean_lux", 20.0)
+    cv2.putText(hud, f"CAM-03 (Night): MOONLIGHT 🌙 ACTIVE (Lux: {n_lux:.1f})", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.46, (255, 180, 50), 1)
+    y += 22
+    cv2.putText(hud, f"   Dual-Path: CLAHE Enhanced + MOG2 Motion", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (200, 200, 200), 1)
+    y += 26
+
+    cv2.line(hud, (15, y), (TW - 15, y), (45, 60, 85), 1)
+    y += 22
+
+    fn_status = "2AM DARK (CLAHE ON)" if fake_night else "NORMAL"
+    fn_col = (0, 150, 255) if fake_night else (160, 160, 160)
+    cv2.putText(hud, f"[N] Fake Night Sim : {fn_status}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.44, fn_col, 1)
+    y += 22
+
+    ht_status = "HR26DQ5551 INJECTED 🚨" if simulated_hotlist else "STANDBY"
+    ht_col = (0, 0, 255) if simulated_hotlist else (160, 160, 160)
+    cv2.putText(hud, f"[H] Hotlist Suspect: {ht_status}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.44, ht_col, 1)
+    y += 22
+
+    tp_status = "LENS BLINDED / TAMPER 🚨" if simulated_tamper else "SECURE (Normal)"
+    tp_col = (0, 0, 255) if simulated_tamper else (0, 255, 150)
+    cv2.putText(hud, f"[T] Tamper Sabotage: {tp_status}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.44, tp_col, 1)
+    y += 22
+
+    zn_status = "ACTIVE" if show_zones else "HIDDEN"
+    cv2.putText(hud, f"[Z] Zones: {zn_status} | [G] Toggle Grid | [Q] Quit", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.44, (0, 200, 255), 1)
+
+    grid[TH:TH * 2, TW:TW * 2] = hud
+
+    # Border lines separating tiles
+    cv2.line(grid, (0, TH), (TW * 2, TH), (0, 220, 255), 2)
+    cv2.line(grid, (TW, 0), (TW, TH * 2), (0, 220, 255), 2)
+    return grid
+
+
 # ---------------- MAIN ----------------
 def main():
     VIDEO_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "data", "test_videos"))
@@ -305,6 +408,8 @@ def main():
     simulated_hotlist = False
     simulated_tamper = False
     show_zones = True
+    use_grid = True
+    headless = "--headless" in sys.argv or os.environ.get("IBVAP_HEADLESS", "0") == "1"
     annotated = {cam_id: None for cam_id in mgr.streams}
     contracts = {}
     breach_cooldown = {}
@@ -316,7 +421,7 @@ def main():
     print(f"Active Cameras: {[s['name'] for s in SOURCES]}")
     print(f"Events Ledger : {EVENTS_PATH}")
     print(f"Hotlist Watch : {len(anpr_engine.hotlist)} suspect vehicles loaded")
-    print("Keys : 'q'=quit | 'n'=night | 'h'=hotlist | 't'=tamper demo | 'z'=zones HUD")
+    print("Controls HUD  : 'q'=quit | 'n'=fake night | 'h'=hotlist | 't'=tamper | 'z'=zones | 'g'=grid")
     print("=" * 65)
 
     interval = 1.0 / TARGET_ANALYSIS_FPS
@@ -411,9 +516,15 @@ def main():
                     pass
 
             # ---- DISPLAY (latest annotated frames) ----
-            for cam_id, stream in mgr.streams.items():
-                if annotated[cam_id] is not None:
-                    cv2.imshow(stream.name, annotated[cam_id])
+            if not headless:
+                curr_fps = tick_count / max(now - print_t0, 1e-3)
+                if use_grid:
+                    grid = build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist, simulated_tamper, show_zones, curr_fps)
+                    cv2.imshow("IBVAP Tactical Multi-Camera Command Grid", grid)
+                else:
+                    for cam_id, stream in mgr.streams.items():
+                        if annotated[cam_id] is not None:
+                            cv2.imshow(stream.name, annotated[cam_id])
 
             # ---- CONSOLE SUMMARY (har 2 sec) ----
             if now - last_print >= 2:
@@ -435,26 +546,34 @@ def main():
                           f'| {len(c["tracks"])} tracks{veh_tag}{plate_tag} | {tl}')
                 last_print = now
 
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):
-                break
-            elif key == ord('n'):
-                fake_night = not fake_night
-                print(f"🌙 FAKE NIGHT: {fake_night}")
-            elif key == ord('h'):
-                simulated_hotlist = not simulated_hotlist
-                print(f"🚨 HOTLIST SIMULATION: {'ACTIVE (HR26DQ5551 Injected)' if simulated_hotlist else 'OFF'}")
-            elif key == ord('t'):
-                simulated_tamper = not simulated_tamper
-                print(f"🚨 CAMERA TAMPER DEMO: {'ACTIVE (Lens Blinded on CAM-01)' if simulated_tamper else 'OFF'}")
-            elif key == ord('z'):
-                show_zones = not show_zones
-                print(f"🛡️ VIRTUAL ZONES OVERLAY: {'ENABLED' if show_zones else 'DISABLED'}")
+            if not headless:
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q'):
+                    break
+                elif key == ord('n'):
+                    fake_night = not fake_night
+                    print(f"🌙 FAKE NIGHT: {fake_night}")
+                elif key == ord('h'):
+                    simulated_hotlist = not simulated_hotlist
+                    print(f"🚨 HOTLIST SIMULATION: {'ACTIVE (HR26DQ5551 Injected)' if simulated_hotlist else 'OFF'}")
+                elif key == ord('t'):
+                    simulated_tamper = not simulated_tamper
+                    print(f"🚨 CAMERA TAMPER DEMO: {'ACTIVE (Lens Blinded on CAM-01)' if simulated_tamper else 'OFF'}")
+                elif key == ord('z'):
+                    show_zones = not show_zones
+                    print(f"🛡️ VIRTUAL ZONES OVERLAY: {'ENABLED' if show_zones else 'DISABLED'}")
+                elif key == ord('g'):
+                    use_grid = not use_grid
+                    cv2.destroyAllWindows()
+                    print(f"🖥️ DISPLAY MODE: {'Unified 2x2 Tactical Grid' if use_grid else 'Individual Windows'}")
+            else:
+                time.sleep(0.005)
     except KeyboardInterrupt:
         pass
     finally:
         mgr.stop_all()
-        cv2.destroyAllWindows()
+        if not headless:
+            cv2.destroyAllWindows()
         print("Engine stopped cleanly. ✅")
 
 
