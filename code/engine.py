@@ -56,8 +56,12 @@ FAKE_NIGHT_FACTOR = 0.22     # 'n' dabane pe frame is factor se dark hoga
 
 # Border-relevant COCO classes (animals bhi — B inko filter karega)
 CLS_COLORS = {
-    "person": (0, 255, 0), "car": (255, 180, 0), "truck": (255, 120, 0),
-    "bus": (255, 120, 0), "bicycle": (0, 200, 255), "motorcycle": (0, 200, 255),
+    "person": (0, 255, 0),         # Lime Green
+    "car": (255, 190, 0),          # Bright Cyan-Blue
+    "truck": (0, 140, 255),        # Deep Orange
+    "bus": (220, 50, 180),         # Tactical Magenta
+    "motorcycle": (0, 240, 255),   # Golden Yellow
+    "bicycle": (0, 255, 180),      # Spring Mint
     "bird": (200, 0, 255), "cat": (200, 0, 255), "dog": (200, 0, 255),
     "horse": (200, 0, 255), "sheep": (200, 0, 255), "cow": (200, 0, 255)
 }
@@ -170,7 +174,9 @@ def log_vehicle_events(tracks, state, stream_name, now, events_path, frame=None,
                     except Exception as e:
                         print(f"⚠️ Ledger append failed for vehicle #{tid}: {e}")
 
-                print(f"🚗 EVENT: {cls_name}#{tid} entered {stream_name} (conf {t['conf']})")
+                v_emojis = {"car": "🚗", "truck": "🚛", "bus": "🚌", "motorcycle": "🏍️", "bicycle": "🚲"}
+                veh_ico = v_emojis.get(cls_name, "🚙")
+                print(f"{veh_ico} EVENT: {cls_name}#{tid} entered {stream_name} (conf {t['conf']})")
 
 
 def build_contract(stream_name, tracks, now, ana_fps, zone_events=None, tamper_status=None):
@@ -427,7 +433,14 @@ def build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist
     v_cnt = sum(v_dict.values())
     plates = c_v.get("plates", [])
     p_str = plates[0]["plate"] if plates else "Scanning..."
-    cv2.putText(hud, f"CAM-02 [Vehicles]: {v_cnt} Veh | Plate: {p_str}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 220, 255), 1)
+    v_parts = []
+    if v_dict.get("car", 0) > 0: v_parts.append(f"{v_dict['car']} Car")
+    if v_dict.get("bus", 0) > 0: v_parts.append(f"{v_dict['bus']} Bus")
+    if v_dict.get("truck", 0) > 0: v_parts.append(f"{v_dict['truck']} Trk")
+    if v_dict.get("motorcycle", 0) > 0: v_parts.append(f"{v_dict['motorcycle']} Moto")
+    if v_dict.get("bicycle", 0) > 0: v_parts.append(f"{v_dict['bicycle']} Bike")
+    v_summary = " ".join(v_parts) if v_parts else f"{v_cnt} Veh"
+    cv2.putText(hud, f"CAM-02 [5-Class] : {v_summary[:25]}", (15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (0, 220, 255), 1)
     y += 20
 
     n_lux = c_n.get("tamper", {}).get("metrics", {}).get("mean_lux", 20.0)
@@ -798,7 +811,16 @@ def main():
                     plate_tag = f" | 🚗 {plate_str}" if plate_str else ""
                     v_dict = c.get("vehicles", {})
                     v_active = sum(v_dict.values())
-                    veh_tag = f" | 🚙 {v_active} veh" if v_active > 0 else ""
+                    if v_active > 0:
+                        v_parts = []
+                        for vk in ["car", "bus", "truck", "motorcycle", "bicycle"]:
+                            vv = v_dict.get(vk, 0)
+                            if vv > 0:
+                                em = {"car": "🚗", "truck": "🚛", "bus": "🚌", "motorcycle": "🏍️", "bicycle": "🚲"}.get(vk, "🚙")
+                                v_parts.append(f"{em}{vv} {vk}")
+                        veh_tag = f" | {', '.join(v_parts)}"
+                    else:
+                        veh_tag = ""
                     print(f'{name}: {night_tag}{threat_tag} | motion={len(c["motion"])} '
                           f'| {len(c["tracks"])} tracks{veh_tag}{plate_tag} | {tl}')
                 last_print = now
