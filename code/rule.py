@@ -87,23 +87,56 @@ PALETTE = [(0,255,0),(255,150,0),(0,200,255),(255,0,255),(0,255,255),
 def id_color(tid):
     return PALETTE[tid % len(PALETTE)]
 
+os.makedirs("data/snapshots", exist_ok=True)
+os.makedirs("data/recorded_clips", exist_ok=True)
+
 # ================= MODEL + SOURCE =================
 model = YOLO("models/yolov8n.pt")
 src = sys.argv[1] if len(sys.argv) > 1 else "0"
+FALLBACK_CLIP = "data/test_videos/people-detection.mp4"
+if not os.path.exists(FALLBACK_CLIP):
+    FALLBACK_CLIP = "data/recorded_clips/demo_surveillance.mp4"
+
 IS_LIVE = src.isdigit() or src.startswith(("http", "rtsp"))
 
+cap = None
 if src.isdigit():
-    cap = cv2.VideoCapture(int(src) + 1, cv2.CAP_DSHOW)   # your real camera = index 1
+    idx = int(src)
+    backend = cv2.CAP_DSHOW if sys.platform.startswith("win") else cv2.CAP_ANY
+    cap = cv2.VideoCapture(idx, backend)
+    
+    # On some Windows machines, internal webcam is index 1
+    if not cap.isOpened() and idx == 0 and sys.platform.startswith("win"):
+        cap = cv2.VideoCapture(1, backend)
+        if cap.isOpened():
+            idx = 1
+            
+    # Fallback to demo video if camera is blocked/unauthorized (common on macOS)
+    if not cap.isOpened() and os.path.exists(FALLBACK_CLIP):
+        print(f"⚠️  Live camera index {src} cannot be opened (macOS camera permissions may be restricted).")
+        print(f"📹  Automatically falling back to sample border surveillance clip: {FALLBACK_CLIP}")
+        src = FALLBACK_CLIP
+        cap = cv2.VideoCapture(src)
+        IS_LIVE = False
 else:
     cap = cv2.VideoCapture(src)
-if not cap.isOpened():
-    print("ERROR: cannot open source:", src); sys.exit(1)
 
-print("Source opened. First detection takes 20-60s on CPU (warming up)...")
-print(f"Source type : {'LIVE (clock+darkness decide night)' if IS_LIVE else 'FILE (darkness only)'}")
+if cap is None or not cap.isOpened():
+    print("ERROR: cannot open source:", src)
+    if src.isdigit():
+        print("💡 Hint on macOS: Grant camera permission to Terminal/IDE in System Settings -> Privacy & Security -> Camera")
+        print(f"   Or run with a video file: python3 code/rule.py {FALLBACK_CLIP}")
+    sys.exit(1)
+
+print("=" * 65)
+print("  IBVAP - Intelligent Border Video Analytics Platform (Rules Engine)")
+print("=" * 65)
+print(f"Source      : {src}")
+print(f"Source type : {'LIVE (clock + darkness decide night)' if IS_LIVE else 'FILE (darkness only decides night)'}")
 print(f"Mode        : {'FORCE_DAY' if FORCE_DAY else 'normal'}")
-print("Controls    : click points -> 'c' arm fence (fallback) | 'r' clear | 'q' quit")
-print(">>> Or draw zones in the browser: http://127.0.0.1:8001/editor <<<")
+print("Controls    : Click 3+ points -> 'c' arm fence | 'p' preset fence | 'r' redraw | 'q' quit")
+print(">>> Fence must be ARMED before zone intrusion alerts can fire! <<<")
+print("=" * 65)
 
 # ================= STATE =================
 drawing_mode, fence_points = True, []
@@ -467,6 +500,18 @@ while True:
         ZONES_MTIME = -1                  # force immediate reload
         refresh_zones()
         print("ZONE SAVED + ARMED (persistent):", [z["name"] for z in zs])
+    elif key == ord('p'):
+        # Arm a preset virtual fence covering the center corridor
+        zs = zonestore.load_zones()
+        zs.append({"name": f"Preset-Corridor-{datetime.datetime.now().strftime('%H%M%S')}",
+                   "type": "restricted",
+                   "points": [[80, 160], [560, 160], [590, 430], [50, 430]]})
+        zonestore.save_zones(zs)
+        fence_points.clear()
+        drawing_mode = False
+        ZONES_MTIME = -1
+        refresh_zones()
+        print("ZONE ARMED (Preset Border Corridor Loaded)")
     elif key == ord('r'):
         zonestore.save_zones([])
         fence_points.clear()

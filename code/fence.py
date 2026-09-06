@@ -1,177 +1,219 @@
 """
-IBVAP - Day 3: Virtual Fence Intrusion Detection
-- Click 4+ points on screen to draw the fence (press 'c' to close/confirm)
-- Any tracked person CROSSING into the fence -> ALERT (red + beep + log)
-Press 'r' to redraw fence | 'q' to quit
+IBVAP — Tactical Multi-Zone Virtual Fencing & Crawling Intrusion Engine
+Provides config-driven dynamic polygon zones (data/zones.json),
+point-in-polygon containment testing, dwell time tracking,
+and crawling/crouching posture detection.
 """
-import sys, time, json, datetime, cv2
+
+import os
+import json
+import time
+import cv2
 import numpy as np
-from ultralytics import YOLO
 
-# ----------------- MODEL + SOURCE -----------------
-model = YOLO("models/yolov8n.pt")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.normpath(os.path.join(BASE_DIR, ".."))
+DEFAULT_ZONES_PATH = os.path.join(ROOT_DIR, "data", "tactical_zones.json")
+if not os.path.exists(DEFAULT_ZONES_PATH):
+    DEFAULT_ZONES_PATH = os.path.join(ROOT_DIR, "data", "zones.json")
 
-src = sys.argv[1] if len(sys.argv) > 1 else "0"
-if src.isdigit():
-    cap = cv2.VideoCapture(int(src) + 1, cv2.CAP_DSHOW)
-else:
-    cap = cv2.VideoCapture(src)
 
-if not cap.isOpened():
-    print("ERROR: cannot open source:", src)
-    sys.exit(1)
+class VirtualFenceManager:
+    """Manages multi-zone polygon virtual fencing per camera stream."""
 
-# ----------------- FENCE DRAWING STATE -----------------
-drawing_mode = True
-fence_points = []          # clicked points
-FENCE = None               # final np array
-inside_state = {}          # tid -> True/False (was inside last frame?)
-dwell_start = {}           # tid -> time when entered zone
-alerts_log = []            # all alert records
+    def __init__(self, zones_file: str = None):
+        if zones_file is None:
+            tactical = os.path.join(ROOT_DIR, "data", "tactical_zones.json")
+            zones_file = tactical if os.path.exists(tactical) else os.path.join(ROOT_DIR, "data", "zones.json")
+        self.zones_file = zones_file
+        self.last_mtime = 0
+        self.zones_by_stream = {}
+        self.dwell_times = {}  # (stream_id, tid, zone_id) -> enter_ts
+        self.reload()
 
-LOG_FILE = "data/alerts_log.jsonl"
+    def reload(self):
+        """Loads or reloads zone definitions from JSON."""
+        if os.path.exists(self.zones_file):
+            try:
+                mtime = os.path.getmtime(self.zones_file)
+                if mtime != self.last_mtime:
+                    with open(self.zones_file, "r") as f:
+                        self.zones_by_stream = json.load(f)
+                    self.last_mtime = mtime
+            except Exception as e:
+                print(f"⚠️ Failed to load {self.zones_file}: {e}")
+        else:
+            self.zones_by_stream = {}
 
-def mouse_click(event, x, y, flags, param):
-    """Left-click adds a fence corner point."""
-    if event == cv2.EVENT_LBUTTONDOWN and drawing_mode:
-        fence_points.append((x, y))
+    def get_zones_for_stream(self, stream_name: str, width: int, height: int) -> list[dict]:
+        """Returns pixel-scaled polygons and metadata for a specific stream."""
+        self.reload()  # Hot-reload if file touched
+        if isinstance(self.zones_by_stream, dict):
+            raw_zones = self.zones_by_stream.get(stream_name, [])
+            if not raw_zones:
+                # Fallback: match by prefix (e.g. CAM-01)
+                for k, v in self.zones_by_stream.items():
+                    if k.split()[0] in stream_name and isinstance(v, list):
+                        raw_zones = v
+                        break
+        elif isinstance(self.zones_by_stream, list):
+            raw_zones = self.zones_by_stream
+        else:
+            raw_zones = []
 
-cv2.namedWindow("IBVAP Fence")
-cv2.setMouseCallback("IBVAP Fence", mouse_click)
-
-def finalize_fence():
-    """Turn clicked points into the fence polygon."""
-    global FENCE, drawing_mode
-    if len(fence_points) >= 3:
-        FENCE = np.array(fence_points, np.int32)
-        drawing_mode = False
-        print(f"FENCE ACTIVE with {len(fence_points)} points:", fence_points)
-    else:
-        print("Need at least 3 points! Click more.")
-
-def draw_fence_overlay(frame):
-    """Red transparent zone + border line."""
-    if FENCE is None:
-        # still drawing: show current points + lines
-        for p in fence_points:
-            cv2.circle(frame, p, 5, (0, 0, 255), -1)
-        if len(fence_points) > 1:
-            pts = np.array(fence_points, np.int32)
-            cv2.polylines(frame, [pts], False, (0, 0, 255), 2)
-        cv2.putText(frame, "CLICK points -> 'c' confirm fence | 'q' quit",
-                    (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        return
-    overlay = frame.copy()
-    cv2.fillPoly(overlay, [FENCE], (0, 0, 180))
-    cv2.addWeighted(overlay, 0.3, frame, 0.7, 0, frame)
-    cv2.polylines(frame, [FENCE], True, (0, 0, 255), 2)
-    cv2.putText(frame, "FENCE ARMED | 'r' redraw | 'q' quit",
-                (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-
-def beep():
-    """Alarm sound without any library (Windows beep via print bell)."""
-    print("\a")   # terminal bell; on most Windows setups this plays a sound
-
-def log_alert(tid, cls, conf, severity, cx, cy):
-    """Write alert to JSONL file (Day 5 will hash-chain this)."""
-    rec = {
-        "time": datetime.datetime.now().isoformat(timespec="seconds"),
-        "event": "FENCE_INTRUSION",
-        "track_id": tid,
-        "class": cls,
-        "confidence": round(conf, 2),
-        "location": [int(cx), int(cy)],
-        "severity": severity
-    }
-    alerts_log.append(rec)
-    with open(LOG_FILE, "a") as f:
-        f.write(json.dumps(rec) + "\n")
-    print("🚨 ALERT:", rec)
-
-prev, fps, n = time.time(), 0.0, 0
-
-# ----------------- MAIN LOOP -----------------
-while True:
-    ok, frame = cap.read()
-    if not ok:
-        break
-    frame = cv2.resize(frame, (640, 480))
-
-    res = model.track(frame, persist=True, tracker="bytetrack.yaml",
-                      imgsz=320, verbose=False)[0]
-
-    now = time.time()
-
-    if res.boxes is not None and res.boxes.id is not None and FENCE is not None:
-        for b in res.boxes:
-            tid  = int(b.id[0])
-            cls  = res.names[int(b.cls[0])]
-            conf = float(b.conf[0])
-            x1, y1, x2, y2 = map(int, b.xyxy[0])
-            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-
-            if cls != "person":        # animals/vehicles don't trip the fence (yet)
+        scaled_zones = []
+        for rz in raw_zones:
+            pts = rz.get("points_norm") or rz.get("points", [])
+            if len(pts) < 3:
                 continue
-
-            # ---- INSIDE TEST ----
-            inside = cv2.pointPolygonTest(FENCE, (cx, cy), False) >= 0
-            was    = inside_state.get(tid, False)
-
-            # ---- CROSSING DETECTED? ----
-            if inside and not was:
-                dwell_start[tid] = now
-                # simple scoring: night adds severity (Day 5 upgrades this fully)
-                hour = datetime.datetime.now().hour
-                severity = "CRITICAL" if (hour >= 22 or hour < 5) else "HIGH"
-                color = (0, 0, 255)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
-                cv2.putText(frame, f"#{tid} INTRUSION! {severity}", (x1, y1 - 25),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-                beep()
-                log_alert(tid, cls, conf, severity, cx, cy)
-            elif inside:
-                # standing inside: show dwell
-                dwell = now - dwell_start.get(tid, now)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
-                cv2.putText(frame, f"#{tid} IN ZONE {dwell:.0f}s", (x1, y1 - 25),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            is_norm = any(isinstance(p[0], float) and p[0] <= 1.0 for p in pts)
+            if is_norm:
+                poly_px = np.array(
+                    [[int(x * width), int(y * height)] for (x, y) in pts],
+                    dtype=np.int32
+                )
             else:
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(frame, f"#{tid}", (x1, y1 - 6),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                poly_px = np.array(pts, dtype=np.int32)
+            scaled_zones.append({
+                "id": rz.get("id", rz.get("name", "ZONE")),
+                "name": rz.get("name", "Tactical Zone"),
+                "type": rz.get("type", "BUFFER_ZONE"),
+                "severity": rz.get("severity", "WARNING"),
+                "color": tuple(rz.get("color", [0, 200, 255])),
+                "poly": poly_px,
+                "poly_norm": pts,
+            })
+        return scaled_zones
 
-            inside_state[tid] = inside
+    def evaluate_tracks(
+        self,
+        stream_name: str,
+        tracks: list[dict],
+        frame_shape: tuple,
+        now: float
+    ) -> list[dict]:
+        """Evaluates all active tracks against stream virtual zones.
+        Returns active breach and warning events with posture & dwell analysis.
+        """
+        h, w = frame_shape[:2]
+        zones = self.get_zones_for_stream(stream_name, w, h)
+        if not zones:
+            return []
 
-    # ---- cleanup lost tracks ----
-    if n % 100 == 0:
-        lost = [tid for tid, val in inside_state.items()]
-        # (simple version: states persist; fine for demo scale)
+        events = []
+        for t in tracks:
+            tid = t["tid"]
+            cls_name = t["cls"]
+            conf = t["conf"]
+            x1, y1, x2, y2 = t["box"]
+            bw = max(1, x2 - x1)
+            bh = max(1, y2 - y1)
+            aspect_ratio = round(bw / bh, 2)
 
-    draw_fence_overlay(frame)
+            # Test using ground contact point (cx, y2) and centroid (cx, cy)
+            cx = (x1 + x2) // 2
+            cy = (y1 + y2) // 2
+            ground_pt = (float(cx), float(y2))
+            center_pt = (float(cx), float(cy))
 
-    # ---- HUD ----
-    n += 1
-    if n % 10 == 0:
-        now2 = time.time()
-        fps = 10 / (now2 - prev) if now2 > prev else 0.0
-        prev = now2
-    cv2.putText(frame, f"FPS: {fps:.1f} | Alerts today: {len(alerts_log)}", (10, 465),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+            for z in zones:
+                # cv2.pointPolygonTest returns > 0 (inside), 0 (edge), < 0 (outside)
+                dist_ground = cv2.pointPolygonTest(z["poly"], ground_pt, False)
+                dist_center = cv2.pointPolygonTest(z["poly"], center_pt, False)
+                is_inside = (dist_ground >= 0) or (dist_center >= 0)
 
-    cv2.imshow("IBVAP Fence", frame)
-    key = cv2.waitKey(1) & 0xFF
+                dwell_key = (stream_name, tid, z["id"])
+                if is_inside:
+                    if dwell_key not in self.dwell_times:
+                        self.dwell_times[dwell_key] = now
+                    dwell_sec = round(now - self.dwell_times[dwell_key], 1)
 
-    if key == ord('q'):
-        break
-    elif key == ord('c') and drawing_mode:
-        finalize_fence()
-    elif key == ord('r'):
-        FENCE = None
-        fence_points.clear()
-        drawing_mode = True
-        inside_state.clear()
-        print("Fence cleared - redraw.")
+                    # Crawling / Crouching detection logic:
+                    # Normal standing person: bw / bh is 0.3 to 0.6
+                    # Crawling / prone human: bw / bh > 1.15
+                    is_crawling = (cls_name == "person" and aspect_ratio >= 1.15)
+                    posture = "CRAWLING_PRONE" if is_crawling else "UPRIGHT"
 
-cap.release()
-cv2.destroyAllWindows()
-print("Day 3 complete - alerts saved to", LOG_FILE)
+                    # Event severity escalation
+                    if z["type"] == "EXCLUSION_ZONE":
+                        severity = "CRITICAL"
+                        event_type = "PERIMETER_BREACH"
+                    elif is_crawling:
+                        severity = "CRITICAL"
+                        event_type = "STEALTH_CRAWL_INTRUSION"
+                    elif dwell_sec > 6.0:
+                        severity = "HIGH"
+                        event_type = "ZONE_LOITERING"
+                    else:
+                        severity = z["severity"]
+                        event_type = "ZONE_ENCROACHMENT"
+
+                    events.append({
+                        "zone_id": z["id"],
+                        "zone_name": z["name"],
+                        "zone_type": z["type"],
+                        "track_id": tid,
+                        "cls": cls_name,
+                        "conf": conf,
+                        "box": [x1, y1, x2, y2],
+                        "dwell_sec": dwell_sec,
+                        "aspect_ratio": aspect_ratio,
+                        "posture": posture,
+                        "severity": severity,
+                        "event_type": event_type
+                    })
+                else:
+                    self.dwell_times.pop(dwell_key, None)
+
+        return events
+
+    def draw_zones(
+        self,
+        frame: np.ndarray,
+        stream_name: str,
+        active_events: list[dict] = None
+    ) -> np.ndarray:
+        """Renders tactical military HUD polygons on video frame."""
+        h, w = frame.shape[:2]
+        zones = self.get_zones_for_stream(stream_name, w, h)
+        if not zones:
+            return frame
+
+        overlay = frame.copy()
+        breached_zones = {e["zone_id"] for e in (active_events or []) if e["severity"] == "CRITICAL"}
+
+        for z in zones:
+            poly = z["poly"]
+            color = z["color"]
+            is_breached = z["id"] in breached_zones
+
+            # If breached, flash high-intensity red
+            if is_breached:
+                fill_color = (0, 0, 255)
+                line_color = (0, 0, 255)
+                alpha = 0.35
+            else:
+                fill_color = color
+                line_color = color
+                alpha = 0.18
+
+            cv2.fillPoly(overlay, [poly], fill_color)
+            cv2.polylines(frame, [poly], True, line_color, 2)
+
+            # Zone label badge
+            pts = poly.reshape(-1, 2)
+            top_pt = pts[np.argmin(pts[:, 1])]
+            bx, by = int(top_pt[0]), max(20, int(top_pt[1]) - 8)
+            label = f"[{z['type']}] {z['name']}"
+            if is_breached:
+                label += " 🚨 BREACH ACTIVE!"
+
+            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+            cv2.rectangle(frame, (bx - 2, by - th - 4), (bx + tw + 6, by + 2), (10, 15, 25), -1)
+            cv2.rectangle(frame, (bx - 2, by - th - 4), (bx + tw + 6, by + 2), line_color, 1)
+            text_color = (255, 255, 255) if is_breached else (220, 230, 255)
+            cv2.putText(frame, label, (bx + 2, by - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.45, text_color, 1)
+
+        # Blend semi-transparent polygon fills
+        cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+        return frame

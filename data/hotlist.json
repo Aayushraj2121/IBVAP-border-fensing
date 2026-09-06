@@ -1,0 +1,37 @@
+{
+  "WR02FKD": {
+    "reason": "BORDER_BREACH_SUSPECT",
+    "severity": "CRITICAL",
+    "description": "Black SUV flagged for unauthorized high-speed approach near BOP."
+  },
+  "FJ14ZHY": {
+    "reason": "NARCOTICS_SMUGGLING_BOLO",
+    "severity": "HIGH",
+    "description": "Vehicle on border narcotics interdiction watchlist."
+  },
+  "HR26DQ5551": {
+    "reason": "NARCOTICS_SMUGGLING_SUSPECT",
+    "severity": "CRITICAL",
+    "description": "Suspect Mahindra Thar flagged by BSF Sector HQ for illicit border crossing attempts."
+  },
+  "DL04C1234": {
+    "reason": "STOLEN_VEHICLE_BOLO",
+    "severity": "HIGH",
+    "description": "Stolen white Bolero pickup reported in Ferozepur sector."
+  },
+  "JK02AK9999": {
+    "reason": "UNAUTHORIZED_RECCE_SUSPECT",
+    "severity": "CRITICAL",
+    "description": "Vehicle identified conducting slow-speed night reconnaissance near perimeter fence."
+  },
+  "PB08AB5678": {
+    "reason": "CONTRABAND_TRANSSHIT_WATCHLIST",
+    "severity": "HIGH",
+    "description": "Commercial carrier linked to suspected cross-border contraband drops."
+  },
+  "UP16AB1234": {
+    "reason": "RESTRICTED_BOP_ENTRY",
+    "severity": "MEDIUM",
+    "description": "Expired gate pass; unauthorized vehicle entry attempt at checkpost."
+  }
+}

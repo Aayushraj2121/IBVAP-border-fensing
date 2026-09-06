@@ -1,13 +1,63 @@
-﻿venv/
+# ==========================================================
+# IBVAP — Intelligent Border Video Analytics Platform
+# Git Ignore Configuration
+# ==========================================================
+
+# --- Byte-compiled / Cache files ---
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# --- Virtual Environments ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Operating System Files ---
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+Desktop.ini
+
+# --- IDE & Editor Settings ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Machine Learning Model Weights ---
+*.pt
+*.onnx
+*.engine
+models/*.pt
+models/*.onnx
+
+# --- Large Media & Video Files ---
 *.mp4
-*.pt
-data/snapshots/
-demo/evidence_clips/
-evidence_chain.jsonl
-data/archive/
-evidence_chain*.jsonl
-models/plate_detector.pt
-*.pt
-data/anchor.txt
+*.avi
+*.mov
+*.mkv
+*.webm
+
+# --- Runtime Data, State & Logs ---
+data/engine_state.json*
+data/events.jsonl
 data/alerts_log.jsonl
+data/evidence_chain*.jsonl
+data/demo_chain.jsonl
+data/anchor.txt
+data/snapshots/*
+!data/snapshots/.gitkeep
+data/recorded_clips/*
+!data/recorded_clips/.gitkeep
+data/certificates/*
+!data/certificates/.gitkeep
+
+# --- Temporary & Scratch Files ---
+*.tmp
+*.log
+.cache/

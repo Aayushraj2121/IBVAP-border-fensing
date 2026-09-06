@@ -11,12 +11,24 @@ model = YOLO("models/yolov8n.pt")
 
 # ----------------- SOURCE (same door as Day 1) -----------------
 src = sys.argv[1] if len(sys.argv) > 1 else "0"
+FALLBACK_CLIP = "data/recorded_clips/demo_surveillance.mp4"
+
+cap = None
 if src.isdigit():
-    cap = cv2.VideoCapture(int(src) + 1, cv2.CAP_DSHOW)   # real camera = index 1
+    idx = int(src)
+    backend = cv2.CAP_DSHOW if sys.platform.startswith("win") else cv2.CAP_ANY
+    cap = cv2.VideoCapture(idx, backend)
+    if not cap.isOpened() and idx == 0 and sys.platform.startswith("win"):
+        cap = cv2.VideoCapture(1, backend)
+    if not cap.isOpened() and os.path.exists(FALLBACK_CLIP):
+        print(f"⚠️  Camera index {src} not accessible (macOS permissions or unavailable).")
+        print(f"📹  Automatically falling back to sample video: {FALLBACK_CLIP}")
+        src = FALLBACK_CLIP
+        cap = cv2.VideoCapture(src)
 else:
     cap = cv2.VideoCapture(src)
 
-if not cap.isOpened():
+if cap is None or not cap.isOpened():
     print("ERROR: cannot open source:", src)
     sys.exit(1)
 

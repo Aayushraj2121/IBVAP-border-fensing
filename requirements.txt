@@ -1,3 +1,9 @@
-﻿ultralytics
-opencv-python
-numpy
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+fastapi>=0.100.0
+uvicorn>=0.22.0
+onnxruntime>=1.15.0
+fast-alpr[onnx]>=0.0.4
+fpdf2>=2.8.0
+pillow>=9.0.0
