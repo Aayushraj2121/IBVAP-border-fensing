@@ -15,7 +15,7 @@ class CameraTamperDetector:
     and histogram collapse in < 1ms per frame.
     """
 
-    def __init__(self, cam_id: str, var_thresh: float = 30.0, std_thresh: float = 12.0):
+    def __init__(self, cam_id: str, var_thresh: float = 30.0, std_thresh: float = 7.5):
         self.cam_id = cam_id
         self.var_thresh = var_thresh  # Blur / defocus threshold
         self.std_thresh = std_thresh  # Occlusion / blackout / spray-paint threshold
