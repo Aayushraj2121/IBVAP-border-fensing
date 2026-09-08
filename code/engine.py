@@ -767,7 +767,9 @@ def main():
                         elif "CAM-05" in st["name"]: tag = "cam5"
                         else: tag = "cam1"
                         live_snap = os.path.join(ROOT_DIR, "data", "snapshots", f"{tag}_live.jpg")
-                        cv2.imwrite(live_snap, annotated[cam_id])
+                        tmp_snap = os.path.join(ROOT_DIR, "data", "snapshots", f".tmp_{tag}_live.jpg")
+                        cv2.imwrite(tmp_snap, annotated[cam_id])
+                        os.replace(tmp_snap, live_snap)
                         c["snapshot_url"] = f"/snapshots/{tag}_live.jpg"
                     except Exception:
                         pass
@@ -783,15 +785,23 @@ def main():
                 except Exception:
                     pass
 
-            # ---- DISPLAY (latest annotated frames) ----
-            if not headless:
-                curr_fps = tick_count / max(now - print_t0, 1e-3)
-                if use_grid:
-                    grid = build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist,
-                                               simulated_tamper, show_zones, curr_fps,
-                                               user_points=user_points, drawing_cam=drawing_cam)
+            # ---- DISPLAY & DASHBOARD MASTER FEED (latest annotated frames) ----
+            curr_fps = tick_count / max(now - print_t0, 1e-3)
+            if use_grid:
+                grid = build_tactical_grid(annotated, mgr, contracts, fake_night, simulated_hotlist,
+                                           simulated_tamper, show_zones, curr_fps,
+                                           user_points=user_points, drawing_cam=drawing_cam)
+                try:
+                    grid_snap = os.path.join(ROOT_DIR, "data", "snapshots", "grid_live.jpg")
+                    tmp_grid = os.path.join(ROOT_DIR, "data", "snapshots", ".tmp_grid_live.jpg")
+                    cv2.imwrite(tmp_grid, grid)
+                    os.replace(tmp_grid, grid_snap)
+                except Exception:
+                    pass
+                if not headless:
                     cv2.imshow(WIN_NAME, grid)
-                else:
+            else:
+                if not headless:
                     for cam_id, stream in mgr.streams.items():
                         if annotated[cam_id] is not None:
                             cv2.imshow(stream.name, annotated[cam_id])

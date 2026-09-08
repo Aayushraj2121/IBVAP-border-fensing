@@ -107,12 +107,24 @@ class ANPREngine:
 
     def _load_hotlist(self) -> dict:
         """Load flagged suspect vehicle watchlist from JSON."""
-        if os.path.exists(self.hotlist_path):
+        load_path = self.hotlist_path
+        if not os.path.exists(load_path):
+            alt = os.path.join(ROOT_DIR, "code", "data", "hotlist.json")
+            if os.path.exists(alt):
+                load_path = alt
+
+        if os.path.exists(load_path):
             try:
-                with open(self.hotlist_path, "r") as f:
+                with open(load_path, "r") as f:
                     data = json.load(f)
-                    # Normalize keys
-                    return {clean_plate_text(k): v for k, v in data.items()}
+                    if isinstance(data, list):
+                        return {
+                            clean_plate_text(item.get("plate", "")): item
+                            for item in data
+                            if "plate" in item and item.get("plate")
+                        }
+                    elif isinstance(data, dict):
+                        return {clean_plate_text(k): v for k, v in data.items()}
             except Exception as e:
                 print(f"⚠️  Failed to load hotlist: {e}")
         return {}

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IBVAP &mdash; Forensic Evidence Vault</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="color-scheme" content="dark" />
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="/static/css/auditor.css" />
+</head>
+<body data-role="{{ user.role }}">
+
+  <div id="access-denied-bar"></div>
+
+  <div class="auditor-shell">
+
+    <!-- ===========================================================
+         SIDEBAR (200px)
+         =========================================================== -->
+    <aside class="auditor-sidebar" aria-label="Auditor navigation">
+      <div class="auditor-brand">
+        <div class="auditor-brand__title">
+          <span>IBVAP</span>
+          <span class="auditor-brand__ver">v1.4</span>
+        </div>
+        <div class="auditor-brand__sub">FORENSIC AUDIT VAULT</div>
+      </div>
+
+      <nav class="auditor-nav">
+        <div class="auditor-nav__label">Audit Navigation</div>
+
+        <button class="auditor-nav__item is-active" id="nav-vault">
+          <svg class="auditor-nav__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M8 1.5l6 2.5v4.5c0 4-3 6.5-6 7.5-3-1-6-3.5-6-7.5V4l6-2.5z" />
+            <path d="M8 5.5v5M5.5 8h5" />
+          </svg>
+          <span>Evidence Vault</span>
+        </button>
+
+        <button class="auditor-nav__item" id="nav-cert">
+          <svg class="auditor-nav__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 2h10v12H3z" />
+            <path d="M6 5h4M6 8h4M6 11h3" />
+          </svg>
+          <span>Certificate Export</span>
+        </button>
+      </nav>
+
+      <div class="auditor-sidebar__footer">
+        <div class="admin-user-pill">
+          <div>
+            <div class="admin-user-pill__name" id="auditor-user-display">{{ user.display_name or 'AUDITOR' }}</div>
+            <div class="admin-user-pill__role">{{ user.role or 'AUDITOR' }}</div>
+          </div>
+          <span class="dot dot--warn" title="Auditor Access Only"></span>
+        </div>
+        <button class="btn btn--ghost" id="auditor-logout-btn" style="width: 100%; border: 1px solid var(--border); font-size: 10px;">
+          LOGOUT SESSION
+        </button>
+      </div>
+    </aside>
+
+    <!-- ===========================================================
+         MAIN VIEW
+         =========================================================== -->
+    <div class="auditor-main">
+
+      <!-- --- TOP BAR (44px) ---------------------------------- -->
+      <header class="auditor-top">
+        <div class="auditor-top__left">
+          <span class="auditor-top__brand">IBVAP</span>
+          <span class="auditor-top__sep">|</span>
+          <span class="auditor-top__title">BOP-7 EVIDENCE VAULT &amp; FORENSIC CHAIN</span>
+        </div>
+        <div class="auditor-top__right">
+          <span class="auditor-top__clock mono" id="auditor-clock">--:--:-- IST</span>
+          <span class="auditor-top__badge mono" id="auditor-badge">AUDITOR</span>
+        </div>
+      </header>
+
+      <!-- --- TOP INTEGRITY BANNER ---------------------------- -->
+      <section class="integrity-banner integrity-banner--ok" id="integrity-banner" aria-live="assertive">
+        <div class="integrity-banner__left">
+          <svg class="integrity-banner__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M13.5 4.5l-7 7L3 8" id="integrity-icon-path" />
+          </svg>
+          <span class="integrity-banner__text" id="integrity-status-text">LEDGER INTEGRITY: VERIFYING...</span>
+          <span class="integrity-banner__sub" id="integrity-sub-text">SHA-256 CHAIN LINKAGE CHECK</span>
+        </div>
+        <div class="integrity-banner__actions">
+          <button class="integrity-banner__btn" id="btn-reverify">RE-VERIFY CHAIN</button>
+        </div>
+      </section>
+
+      <!-- --- 2-COLUMN GRID (TIMELINE + RIGHT PANEL) ---------- -->
+      <main class="auditor-grid">
+
+        <!-- 1. LEFT / CENTER: VERTICAL LEDGER TIMELINE -->
+        <section class="timeline-panel" aria-labelledby="timeline-header">
+          <div class="panel__header">
+            <span id="timeline-header">VERTICAL LEDGER TIMELINE &mdash; CHAIN-SEALED BLOCKS</span>
+            <span class="chip chip--ok mono" id="ledger-count-chip">LOADING...</span>
+          </div>
+          <div class="timeline-scroll" id="timeline-container" role="feed" aria-busy="true">
+            <!-- Timeline blocks rendered dynamically by auditor.js -->
+          </div>
+        </section>
+
+        <!-- 2. RIGHT PANEL: EXPORT SECTION 65B CERTIFICATE -->
+        <aside class="export-panel" aria-labelledby="export-header">
+          <div class="panel__header">
+            <span id="export-header">EXPORT SECTION 65B CERTIFICATE</span>
+            <span class="chip chip--warn mono">BSA 2023 §65B</span>
+          </div>
+
+          <form class="export-form" id="export65b-form" autocomplete="off">
+            <div class="export-notice">
+              <strong>STATUTORY ADMISSIBILITY CERTIFICATE</strong>
+              Generates court-admissible forensic certificate under Section 65B Bharatiya Sakshya Adhiniyam, 2023 with SHA-256 chain-seal metadata.
+            </div>
+
+            <div class="form-field">
+              <label for="export-seq">Target Event / Block *</label>
+              <select id="export-seq" name="seq" class="mono">
+                <option value="">Latest Chained Block (Default)</option>
+              </select>
+            </div>
+
+            <div class="date-range-row">
+              <div class="form-field">
+                <label for="export-from">Date From</label>
+                <input type="date" id="export-from" name="date_from" value="2026-09-01" class="mono" />
+              </div>
+              <div class="form-field">
+                <label for="export-to">Date To</label>
+                <input type="date" id="export-to" name="date_to" value="2026-09-08" class="mono" />
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label for="export-case-id">Case / FIR ID *</label>
+              <input type="text" id="export-case-id" name="case_id" class="mono" value="FIR-2026-BOP7-0941" required />
+            </div>
+
+            <div class="form-field">
+              <label for="export-officer">Officer Name *</label>
+              <input type="text" id="export-officer" name="officer_name" value="Inspector R. K. Verma" required />
+            </div>
+
+            <div class="form-field">
+              <label>Evidence Node</label>
+              <input type="text" class="mono" value="BOP-7 SECURE NODE (IBVAP v1.4)" readonly style="color:var(--dim);" />
+            </div>
+
+            <div class="export-btn-wrap">
+              <button type="submit" class="btn btn--primary" id="btn-generate-pdf" style="width: 100%; padding: 10px 12px;">
+                GENERATE SIGNED PDF
+              </button>
+            </div>
+
+            <div class="export-status" id="export-status-msg" role="status"></div>
+          </form>
+        </aside>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/auditor.js"></script>
+</body>
+</html>

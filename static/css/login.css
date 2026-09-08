@@ -1,0 +1,275 @@
+/* ==========================================================================
+   login.html — page-specific styles
+   Layout: centered card on --bg, dense control-room terminal feel.
+   ========================================================================== */
+
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Faint grid background — subtle, no color fade.
+   Implemented as a tiny inline SVG (data URI) so we never touch the
+   linear-color-stop() CSS primitive (spec forbids color stops). */
+.login-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><path d='M32 0H0V32' fill='none' stroke='%231F2A3C' stroke-width='1'/></svg>");
+  background-repeat: repeat;
+  opacity: 0.18;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Top-right corner stamp — node identifier, very small */
+.login-stamp {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 0.5px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.login-stamp .dot { animation: pulse-ok 2.4s ease-in-out infinite; }
+
+@keyframes pulse-ok {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+/* --- Card ------------------------------------------------------------- */
+
+.login-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: var(--shadow-card);
+  padding: 28px 24px 20px;
+}
+
+/* Card top — thin accent stripe (solid color only, no effects). */
+.login-card::before {
+  content: "";
+  display: block;
+  height: 2px;
+  background: var(--accent);
+  margin: -28px -24px 20px;
+  border-radius: 4px 4px 0 0;
+}
+
+.login-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.login-brand__mark {
+  font-family: var(--font-ui);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text);
+  line-height: 1;
+}
+.login-brand__ver {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+
+.login-sub {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+
+/* --- Form ------------------------------------------------------------- */
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  font-weight: 500;
+}
+.field__input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 10px 12px;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+.field__input:focus { border-color: var(--accent); }
+.field__input::placeholder {
+  color: var(--dim);
+  font-family: var(--font-ui);
+  font-size: 12px;
+}
+
+/* Inline status message (errors etc.) — lives above the button */
+.login-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  min-height: 14px;
+  margin-top: 2px;
+}
+.login-status.is-error   { color: var(--crit); }
+.login-status.is-warn    { color: var(--warn); }
+.login-status.is-ok      { color: var(--ok); }
+.login-status.is-loading { color: var(--dim); }
+
+.login-submit {
+  margin-top: 4px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: #FFFFFF;
+  padding: 11px 12px;
+  width: 100%;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.75px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.login-submit:hover:not(:disabled) { background: #3A8AE0; border-color: #3A8AE0; }
+.login-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.login-submit__spinner {
+  display: none;
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #FFFFFF;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+.login-submit.is-loading .login-submit__spinner { display: inline-block; }
+.login-submit.is-loading .login-submit__label { opacity: 0.8; }
+.login-submit.is-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* --- Card footer (hint line) ----------------------------------------- */
+
+.login-hint {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--dim);
+  letter-spacing: 0.3px;
+  text-align: center;
+}
+
+/* --- Below-card monospace line --------------------------------------- */
+
+.login-node-line {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--dim);
+  letter-spacing: 0.4px;
+  text-align: center;
+}
+.login-node-line .sep { color: var(--border); padding: 0 6px; }
+
+/* --- Footer status row (three dots) ---------------------------------- */
+
+.login-status-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+}
+.login-status-row .item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.login-status-row .item .dot {
+  width: 6px;
+  height: 6px;
+}
+.login-status-row .sep { color: var(--border); }
+
+/* --- Demo credential hint (small, dim — only useful for the build) --- */
+
+.login-demo {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--dim);
+  text-align: center;
+  margin-top: 8px;
+  line-height: 1.6;
+  opacity: 0.85;
+}
+.login-demo code {
+  color: var(--accent);
+  font-family: inherit;
+}
+
+/* --- Mobile tighten -------------------------------------------------- */
+
+@media (max-width: 480px) {
+  .login-card { padding: 24px 18px 18px; }
+  .login-card::before { margin: -24px -18px 16px; }
+  .login-stamp { font-size: 9px; }
+}

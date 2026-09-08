@@ -1,0 +1,108 @@
+{
+  "CAM-01 (People)": [
+    {
+      "zone_id": "CAM-0-CUSTOM-EXC",
+      "zone_name": "Custom Exclusion Fence (CAM-01)",
+      "zone_type": "EXCLUSION_ZONE",
+      "pts": [
+        [
+          160,
+          40
+        ],
+        [
+          620,
+          40
+        ],
+        [
+          620,
+          380
+        ],
+        [
+          160,
+          380
+        ]
+      ]
+    },
+    {
+      "zone_id": "Z-CAM-01-1788899345500",
+      "zone_name": "Operator Drawn 20:29:05",
+      "zone_type": "EXCLUSION_ZONE",
+      "pts": [
+        [
+          373,
+          105
+        ],
+        [
+          61,
+          107
+        ],
+        [
+          81,
+          280
+        ],
+        [
+          352,
+          265
+        ],
+        [
+          361,
+          284
+        ],
+        [
+          361,
+          284
+        ]
+      ]
+    }
+  ],
+  "CAM-03 (Night CCTV)": [
+    {
+      "zone_id": "Z1",
+      "zone_name": "Gate",
+      "zone_type": "EXCLUSION_ZONE",
+      "pts": [
+        [
+          10,
+          10
+        ],
+        [
+          100,
+          10
+        ],
+        [
+          100,
+          100
+        ],
+        [
+          10,
+          100
+        ]
+      ]
+    }
+  ],
+  "CAM-05 (Face Recognition)": [
+    {
+      "zone_id": "CAM-0-CUSTOM-EXC",
+      "zone_name": "Custom Exclusion Fence (CAM-05)",
+      "zone_type": "EXCLUSION_ZONE",
+      "pts": [
+        [
+          120,
+          80
+        ],
+        [
+          630,
+          80
+        ],
+        [
+          630,
+          230
+        ],
+        [
+          120,
+          230
+        ]
+      ]
+    }
+  ]
+}

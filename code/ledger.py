@@ -1,168 +1,177 @@
 """
-IBVAP - Day 5: Tamper-Evident Evidence Ledger
-- Hash chain: each record's SHA-256 includes the previous record's hash
-- verify: recompute whole chain; any edit/delete/reorder = TAMPERED
-- anchor: publish chain head externally (anti-truncation)
+IBVAP — Identity, Behavior & Video Analytics Platform
+BOP-7 Secure Node | v1.4
 
-Commands:
-  python code/ledger.py demo      <- SAFE automated tamper demo (separate file)
-  python code/ledger.py verify    <- verify REAL evidence chain
-  python code/ledger.py status    <- show chain head + record count
-  python code/ledger.py anchor    <- anchor current head (publish seal)
+ledger.py — Append-only SHA-256 chained event ledger.
+
+Each line in code/data/events.jsonl is a JSON object:
+  {
+    "seq": 1,
+    "ts": 1788861245.913,
+    "prev_hash": "0000...",
+    "this_hash": "abcd...",
+    "event": { ... arbitrary event payload ... }
+  }
+
+verify_chain() walks the file and confirms cryptographic hash linkage. Returns
+{"status": "OK", "records": N, "head": "..."} or
+{"status": "BROKEN", "broken_at_seq": N, "detail": "..."}.
 """
-import hashlib, json, datetime, sys, os
 
-CHAIN_FILE = "data/evidence_chain.jsonl"
-ANCHOR_FILE = "data/anchor.txt"
-DEMO_FILE = "data/demo_chain.jsonl"
+from __future__ import annotations
 
-# ---------------- core primitives ----------------
-def _canonical(event: dict) -> str:
-    """Stable JSON (sorted keys, no spaces) -> deterministic hashing."""
-    return json.dumps(event, sort_keys=True, separators=(",", ":"))
+import hashlib
+import json
+import os
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-def compute_hash(event: dict, prev_hash: str) -> str:
-    """Seal = SHA256(canonical(event) + previous seal)."""
-    return hashlib.sha256((_canonical(event) + prev_hash).encode()).hexdigest()
+_EVENTS_PATH = Path(__file__).resolve().parent / "data" / "events.jsonl"
+_GENESIS_PREV = "0" * 64
+CHAIN_FILE = str(_EVENTS_PATH)
+
+
+def _events_path() -> Path:
+    """Resolve the events file path. Created on first append if missing."""
+    _EVENTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if not _EVENTS_PATH.exists():
+        _EVENTS_PATH.touch()
+    return _EVENTS_PATH
+
 
 def file_sha256(path: str) -> str:
-    """SHA-256 of a file (seals the snapshot JPG itself!)."""
+    """SHA-256 of a file (used for cryptographic snapshot verification)."""
     h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            h.update(chunk)
-    return h.hexdigest()
+    try:
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
+        return ""
 
-# ---------------- chain operations ----------------
-def load_chain(path: str = CHAIN_FILE) -> list:
-    if not os.path.exists(path):
-        return []
-    out = []
-    with open(path) as f:
+
+def _hash_record(prev_hash: str, seq: int, ts: float, event: Dict[str, Any]) -> str:
+    """SHA-256 over (prev_hash || seq || ts || canonical JSON of event)."""
+    payload = prev_hash + str(seq) + repr(ts) + json.dumps(event, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def compute_hash(event: dict, prev_hash: str) -> str:
+    """Canonical hash computation."""
+    payload = json.dumps(event, sort_keys=True, separators=(",", ":")) + prev_hash
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _read_all_records() -> List[Dict[str, Any]]:
+    """Read every line of the ledger into a list of dicts. Skips blank lines."""
+    path = _events_path()
+    records: List[Dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            if line:
-                out.append(json.loads(line))
-    return out
+            if not line:
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                # Malformed line — surface as raw record for verify_chain to flag.
+                records.append({"_raw": line, "_malformed": True})
+    return records
 
-def append_event(event: dict, path: str = CHAIN_FILE) -> dict:
-    """Seal event onto the chain. Returns the full sealed record."""
-    records = load_chain(path)
-    prev = records[-1]["hash"] if records else "GENESIS"
-    rec = dict(event)
-    rec["prev"] = prev
-    rec["hash"] = compute_hash(event, prev)
-    with open(path, "a") as f:
-        f.write(json.dumps(rec) + "\n")
-    return rec
 
-def verify_chain(path: str = CHAIN_FILE):
-    """Returns (ok, bad_index_or_None, message, head_hash)."""
-    records = load_chain(path)
-    prev = "GENESIS"
-    for i, rec in enumerate(records):
-        event = {k: v for k, v in rec.items() if k not in ("prev", "hash")}
-        if compute_hash(event, prev) != rec.get("hash"):
-            return False, i, f"Record {i}: content hash mismatch (EDITED)", rec.get("hash", "?")
-        if rec.get("prev") != prev:
-            return False, i, f"Record {i}: prev-link broken (DELETED/REORDERED)", rec.get("hash", "?")
-        prev = rec["hash"]
-    head = records[-1]["hash"] if records else "GENESIS"
-    return True, None, f"Chain intact - {len(records)} records verified", head
+def load_chain(path: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Legacy helper: loads all records from the ledger."""
+    return _read_all_records()
 
-def anchor_head(path: str = CHAIN_FILE):
-    """Publish current head hash to anchor file (external trusted point)."""
-    ok, _, msg, head = verify_chain(path)
-    if not ok:
-        print("❌ Cannot anchor a broken chain:", msg)
-        return
-    with open(ANCHOR_FILE, "a") as f:
-        f.write(json.dumps({"time": datetime.datetime.now().isoformat(timespec="seconds"),
-                            "head": head, "records": len(load_chain(path))}) + "\n")
-    print("📌 Anchored head:", head[:24], "->", ANCHOR_FILE)
 
-def check_anchor(path: str = CHAIN_FILE):
-    """If anchored: detect TRUNCATION (records deleted after anchoring)."""
-    if not os.path.exists(ANCHOR_FILE):
-        return
-    ok, _, _, head = verify_chain(path)
-    if not ok:
-        return
-    anchors = [json.loads(l) for l in open(ANCHOR_FILE) if l.strip()]
-    last = anchors[-1]
-    if head != last["head"]:
-        print("⚠️  WARNING: current head differs from last anchor.")
-        print("   Anchored records:", last["records"], "| current:", len(load_chain(path)))
-        print("   -> Possible TRUNCATION (tail records removed after anchoring)!")
+def append_event(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Append a single event to the ledger with a chained SHA-256 hash.
+
+    The event dict is wrapped with seq, ts, prev_hash, this_hash. The original
+    event payload is preserved under the "event" key.
+    """
+    if not isinstance(event, dict):
+        raise TypeError("event must be a dict")
+
+    records = _read_all_records()
+    if records:
+        last = records[-1]
+        prev_hash = last.get("this_hash", _GENESIS_PREV)
+        next_seq = int(last.get("seq", 0)) + 1
     else:
-        print("✅ Head matches last anchor - no truncation.")
+        prev_hash = _GENESIS_PREV
+        next_seq = 1
 
-# ---------------- CLI ----------------
-def cmd_status():
-    records = load_chain()
+    ts = time.time()
+    this_hash = _hash_record(prev_hash, next_seq, ts, event)
+    record = {
+        "seq": next_seq,
+        "ts": ts,
+        "prev_hash": prev_hash,
+        "this_hash": this_hash,
+        "event": event,
+    }
+
+    path = _events_path()
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, separators=(",", ":")) + "\n")
+
+    return record
+
+
+def verify_chain() -> Dict[str, Any]:
+    """
+    Walk the ledger and confirm every record's this_hash matches
+    SHA-256(prev_hash || seq || ts || event). Returns:
+      {"status": "OK", "records": N, "head": "..."}     on success
+      {"status": "BROKEN", "broken_at_seq": N, "detail": "..."}  on failure
+    """
+    records = _read_all_records()
     if not records:
-        print("Chain is EMPTY (no evidence sealed yet).")
-        return
-    print(f"Records: {len(records)}")
-    print("Head seal:", records[-1]["hash"])
+        return {"status": "OK", "records": 0, "head": _GENESIS_PREV}
 
-def cmd_verify():
-    ok, bad, msg, head = verify_chain()
-    print("=" * 55)
-    if ok:
-        print("✅ EVIDENCE CHAIN VERIFIED")
-        print("   ", msg)
-        print("    Head:", head[:32], "...")
-        check_anchor()
-    else:
-        print("🚨 TAMPERED — EVIDENCE CHAIN BROKEN 🚨")
-        print("   ", msg)
-        print('    → Record index', bad, 'was modified/deleted after sealing!')
-    print("=" * 55)
+    prev_hash = _GENESIS_PREV
+    for i, rec in enumerate(records, start=1):
+        if rec.get("_malformed"):
+            return {
+                "status": "BROKEN",
+                "broken_at_seq": i,
+                "detail": f"malformed JSON at line {i}: {rec.get('_raw','')[:80]}",
+                "head": prev_hash,
+            }
+        if rec.get("prev_hash") != prev_hash:
+            return {
+                "status": "BROKEN",
+                "broken_at_seq": rec.get("seq", i),
+                "detail": f"prev_hash mismatch at seq {rec.get('seq', i)}",
+                "head": prev_hash,
+            }
+        recomputed = _hash_record(rec["prev_hash"], rec["seq"], rec["ts"], rec["event"])
+        if recomputed != rec.get("this_hash"):
+            return {
+                "status": "BROKEN",
+                "broken_at_seq": rec.get("seq", i),
+                "detail": f"this_hash mismatch at seq {rec.get('seq', i)}",
+                "head": prev_hash,
+            }
+        prev_hash = rec["this_hash"]
 
-def cmd_demo():
-    """SAFE end-to-end tamper demo on a separate file."""
-    path = DEMO_FILE
-    if os.path.exists(path):
-        os.remove(path)
-    print("--- 1. Sealing 3 sample alerts ---")
-    for i in range(3):
-        rec = append_event({"event": "SUSPICION_ALERT", "track_id": i + 1,
-                            "score": 70 + i, "severity": "CRITICAL",
-                            "time": datetime.datetime.now().isoformat(timespec="seconds")},
-                           path)
-        print(f"   sealed record {i} -> {rec['hash'][:20]}...")
+    return {"status": "OK", "records": len(records), "head": prev_hash}
 
-    print("\n--- 2. Verifying intact chain ---")
-    ok, _, msg, _ = verify_chain(path)
-    print("   ✅ VERIFIED" if ok else "   ❌", "|", msg)
 
-    print("\n--- 3. INSIDER ATTACK: editing record 1 (CRITICAL -> LOGGED) ---")
-    lines = open(path).readlines()
-    rec = json.loads(lines[1])
-    rec["severity"] = "LOGGED"                     # the tamper!
-    lines[1] = json.dumps(rec) + "\n"
-    open(path, "w").writelines(lines)
-    print("   (record edited and saved)")
+def tail_records(n: int = 50) -> List[Dict[str, Any]]:
+    """Return the last n ledger records (newest last)."""
+    records = _read_all_records()
+    return records[-n:] if n < len(records) else records
 
-    print("\n--- 4. Verifying tampered chain ---")
-    ok, bad, msg, _ = verify_chain(path)
-    if not ok:
-        print("   🚨 TAMPERED DETECTED!", msg)
-    else:
-        print("   ❌ tamper NOT caught (bug!)")
-
-    print("\n--- 5. Restoring original chain ---")
-    lines[1] = json.dumps({**json.loads(lines[1]), "severity": "CRITICAL"}) + "\n"
-    open(path, "w").writelines(lines)
-    ok, _, msg, _ = verify_chain(path)
-    print("   ✅ VERIFIED again" if ok else "   ❌", "|", msg)
-    print("\nDemo complete. This is why insiders cannot quietly rewrite history.")
 
 if __name__ == "__main__":
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "verify"
-    if cmd == "demo":   cmd_demo()
-    elif cmd == "verify": cmd_verify()
-    elif cmd == "status": cmd_status()
-    elif cmd == "anchor": anchor_head()
-    else: print("Unknown command. Use: demo | verify | status | anchor")
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "verify":
+        print(json.dumps(verify_chain(), indent=2))
+    else:
+        print(f"ledger path: {_events_path()}")
+        print(f"records: {len(_read_all_records())}")

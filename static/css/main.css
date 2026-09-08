@@ -1,0 +1,255 @@
+/* ==========================================================================
+   IBVAP — Identity, Behavior & Video Analytics Platform
+   BOP-7 Secure Node | v1.4
+   Global stylesheet — design tokens, base typography, layout primitives.
+   ========================================================================== */
+
+/* --- Fonts (served locally — no CDN dependency at runtime) -------------- */
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/static/fonts/Inter-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/static/fonts/Inter-Variable-Italic.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/static/fonts/JetBrainsMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* --- Design tokens (LOCKED — never use other hues) --------------------- */
+
+:root {
+  --bg:      #0A0F1A;   /* page background */
+  --surface: #101828;   /* cards, panels */
+  --border:  #1F2A3C;   /* dividers, inputs */
+  --accent:  #2E7DD1;   /* primary action blue */
+  --ok:      #2E9E6B;   /* secure / normal */
+  --warn:    #C98A2B;   /* warning */
+  --crit:    #C93A3A;   /* critical / breach */
+  --text:    #E8EDF4;   /* primary text */
+  --dim:     #8A97A8;   /* labels, secondary text */
+
+  /* Typography */
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+
+  /* Density */
+  --gap: 8px;
+  --pad: 12px;
+  --pad-sm: 10px;
+  --radius: 4px;
+
+  /* One subtle card shadow — only allowed shadow in the system */
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* --- Reset ------------------------------------------------------------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.4;
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+button { cursor: pointer; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { display: block; max-width: 100%; }
+
+/* --- Panel primitives (used across all pages) ------------------------- */
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+.panel__header {
+  padding: var(--pad-sm) var(--pad);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+}
+.panel__body {
+  padding: var(--pad);
+}
+
+/* --- Status dots ------------------------------------------------------ */
+
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot--ok   { background: var(--ok); }
+.dot--warn { background: var(--warn); }
+.dot--crit { background: var(--crit); }
+.dot--dim  { background: var(--dim); }
+
+/* --- Severity / threat chips ----------------------------------------- */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  color: var(--dim);
+}
+.chip--ok   { color: var(--ok);   border-color: rgba(46,158,107,0.4); }
+.chip--warn { color: var(--warn); border-color: rgba(201,138,43,0.4); }
+.chip--crit { color: var(--crit); border-color: rgba(201,58,58,0.5); }
+
+/* --- Mono utilities (timestamps, IDs, plate numbers, stat numbers) ---- */
+
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* --- Inputs / buttons (shared across pages) --------------------------- */
+
+.input,
+.btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 10px 12px;
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+.input:focus { border-color: var(--accent); }
+.input::placeholder { color: var(--dim); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap);
+  font-weight: 500;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #FFFFFF;
+}
+.btn--primary:hover { background: #3A8AE0; border-color: #3A8AE0; }
+.btn--primary:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn--ghost {
+  background: transparent;
+  color: var(--text);
+}
+.btn--ghost:hover { background: rgba(255,255,255,0.04); }
+
+/* --- Inline alert banner (403 ACCESS DENIED, etc.) ------------------- */
+
+.alert-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.alert-bar--crit {
+  background: rgba(201, 58, 58, 0.12);
+  border: 1px solid rgba(201, 58, 58, 0.45);
+  color: var(--crit);
+}
+.alert-bar--warn {
+  background: rgba(201, 138, 43, 0.12);
+  border: 1px solid rgba(201, 138, 43, 0.45);
+  color: var(--warn);
+}
+
+/* --- Access-denied overlay (used by main.js for 403s) ----------------- */
+
+#access-denied-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 9999;
+  display: none;
+  background: rgba(201, 58, 58, 0.15);
+  border-bottom: 1px solid var(--crit);
+  color: var(--crit);
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+#access-denied-bar.is-visible { display: block; }
+
+/* --- Utility ---------------------------------------------------------- */
+
+.u-hidden { display: none !important; }
+.u-mono   { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.u-dim    { color: var(--dim); }
+.u-text-right { text-align: right; }
+
+/* Scrollbar — keep dense, dark */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #2A3A55; }

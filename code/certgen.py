@@ -181,7 +181,14 @@ def main():
     if idx < 0 or idx >= len(records):
         print("Invalid record index " + str(idx) + " (valid: 0.." + str(len(records) - 1) + ")")
         return
-    ok, bad, msg, head = verify_chain()
+    v_res = verify_chain()
+    if isinstance(v_res, dict):
+        ok = (v_res.get("status") == "OK")
+        bad = v_res.get("broken_at_seq")
+        msg = v_res.get("detail", f"Chain {'intact' if ok else 'broken'}")
+        head = v_res.get("head", "")
+    else:
+        ok, bad, msg, head = v_res
     verdict = {"ok": ok, "bad": bad, "msg": msg, "head": head}
     path = build_certificate(idx, records[idx], verdict)
     print("=" * 55)

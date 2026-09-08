@@ -1,0 +1,38 @@
+[
+  {
+    "plate": "HR 55 AT 8899",
+    "vehicle_class": "Container Truck",
+    "reason": "NARCOTICS",
+    "added_date": "2026-09-08",
+    "notes": "Testing inline add",
+    "added_by": "admin"
+  },
+  {
+    "plate": "PB 02 BB 9942",
+    "vehicle_class": "Heavy Commercial (HCV)",
+    "reason": "NARCOTICS",
+    "added_date": "2026-09-07",
+    "notes": "Border Sector B narcotics transport suspect"
+  },
+  {
+    "plate": "HR 26 DQ 5510",
+    "vehicle_class": "Light Commercial (LCV)",
+    "reason": "SMUGGLING",
+    "added_date": "2026-09-08",
+    "notes": "Contraband transit flag (customs alert)"
+  },
+  {
+    "plate": "DL 1C AA 1109",
+    "vehicle_class": "SUV / 4x4",
+    "reason": "NARCOTICS",
+    "added_date": "2026-09-08",
+    "notes": "Surveillance target Bravo-4 vehicle"
+  },
+  {
+    "plate": "GJ 01 KZ 4419",
+    "vehicle_class": "Container Truck",
+    "reason": "SMUGGLING",
+    "added_date": "2026-09-08",
+    "notes": "Unmanifested cargo suspected at North Gate"
+  }
+]

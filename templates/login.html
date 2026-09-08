@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IBVAP &mdash; Command Access Terminal</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="color-scheme" content="dark" />
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="/static/css/login.css" />
+</head>
+<body>
+
+  <main class="login-shell">
+
+    <!-- Top-right node stamp -->
+    <div class="login-stamp">
+      <span class="dot dot--ok" aria-hidden="true"></span>
+      <span>BOP-7 / NODE-A / SECURE</span>
+    </div>
+
+    <!-- Login card -->
+    <section class="login-card" aria-labelledby="login-brand">
+      <div class="login-brand">
+        <span class="login-brand__mark" id="login-brand">IBVAP</span>
+        <span class="login-brand__ver">v1.4</span>
+      </div>
+      <p class="login-sub">COMMAND ACCESS TERMINAL</p>
+
+      <form class="login-form" id="login-form" autocomplete="off" novalidate>
+        <div class="field">
+          <label class="field__label" for="username">Operator ID</label>
+          <input
+            class="field__input"
+            id="username"
+            name="username"
+            type="text"
+            inputmode="email"
+            autocomplete="username"
+            spellcheck="false"
+            autocapitalize="off"
+            autocorrect="off"
+            placeholder="enter operator id"
+            required
+          />
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="password">Passphrase</label>
+          <input
+            class="field__input"
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            spellcheck="false"
+            placeholder="enter passphrase"
+            required
+          />
+        </div>
+
+        <div class="login-status" id="login-status" role="status" aria-live="polite"></div>
+
+        <button class="login-submit" id="login-submit" type="submit">
+          <span class="login-submit__spinner" aria-hidden="true"></span>
+          <span class="login-submit__label">AUTHENTICATE</span>
+        </button>
+      </form>
+
+      <p class="login-hint">Authorized personnel only &middot; all access logged &middot; chain-sealed</p>
+    </section>
+
+    <!-- Monospace node line -->
+    <div class="login-node-line">
+      <span>BOP-7 SECURE NODE</span>
+      <span class="sep">|</span>
+      <span>v1.4</span>
+      <span class="sep">|</span>
+      <span>AUTHORIZED PERSONNEL ONLY</span>
+    </div>
+
+    <!-- Footer status dots row -->
+    <div class="login-status-row" role="list">
+      <span class="item" role="listitem">
+        <span class="dot dot--ok" aria-hidden="true"></span>
+        <span>Encryption Active</span>
+      </span>
+      <span class="sep">&middot;</span>
+      <span class="item" role="listitem">
+        <span class="dot dot--ok" aria-hidden="true"></span>
+        <span>Ledger Sealed</span>
+      </span>
+      <span class="sep">&middot;</span>
+      <span class="item" role="listitem">
+        <span class="dot dot--ok" aria-hidden="true"></span>
+        <span>RBAC Enabled</span>
+      </span>
+    </div>
+
+    <!-- Demo credentials hint — shown only in this build environment -->
+    <div class="login-demo">
+      demo: <code>admin</code> / <code>admin123</code> &middot;
+      <code>operator</code> / <code>op123</code> &middot;
+      <code>auditor</code> / <code>audit123</code>
+    </div>
+
+  </main>
+
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/login.js"></script>
+</body>
+</html>

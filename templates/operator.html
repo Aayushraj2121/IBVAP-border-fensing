@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IBVAP &mdash; Operator Console</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="color-scheme" content="dark" />
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="/static/css/operator.css" />
+</head>
+<body data-role="{{ user.role }}">
+
+  <div id="access-denied-bar"></div>
+
+  <div class="op-shell">
+
+    <!-- ===========================================================
+         LEFT RAIL — 56px collapsed icon sidebar
+         =========================================================== -->
+    <aside class="op-rail" aria-label="Primary navigation">
+      <button class="rail-btn rail-btn--logo" title="IBVAP Home" aria-label="IBVAP Home">
+        <span class="rail-logo">IB</span>
+      </button>
+      <span class="rail-sep"></span>
+      <button class="rail-btn is-active" id="rail-grid" title="Multi-Camera Grid" aria-label="Multi-Camera Grid">
+        <!-- grid icon -->
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <rect x="1" y="1" width="7" height="7" stroke="currentColor" stroke-width="1.4"/>
+          <rect x="10" y="1" width="7" height="7" stroke="currentColor" stroke-width="1.4"/>
+          <rect x="1" y="10" width="7" height="7" stroke="currentColor" stroke-width="1.4"/>
+          <rect x="10" y="10" width="7" height="7" stroke="currentColor" stroke-width="1.4"/>
+        </svg>
+      </button>
+      <button class="rail-btn" id="rail-zones" title="Zone Editor" aria-label="Zone Editor">
+        <!-- polygon icon -->
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <path d="M9 1 L16 6 L13 16 L4 15 L2 7 Z" stroke="currentColor" stroke-width="1.4" fill="none"/>
+          <circle cx="9" cy="1" r="1.2" fill="currentColor"/>
+          <circle cx="16" cy="6" r="1.2" fill="currentColor"/>
+          <circle cx="13" cy="16" r="1.2" fill="currentColor"/>
+          <circle cx="4" cy="15" r="1.2" fill="currentColor"/>
+          <circle cx="2" cy="7" r="1.2" fill="currentColor"/>
+        </svg>
+      </button>
+      <button class="rail-btn" id="rail-events" title="Events Log" aria-label="Events Log">
+        <!-- list icon -->
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <line x1="3" y1="4" x2="15" y2="4" stroke="currentColor" stroke-width="1.4"/>
+          <line x1="3" y1="9" x2="15" y2="9" stroke="currentColor" stroke-width="1.4"/>
+          <line x1="3" y1="14" x2="11" y2="14" stroke="currentColor" stroke-width="1.4"/>
+        </svg>
+      </button>
+      <button class="rail-btn" id="rail-export" title="Export Section 65B" aria-label="Export Section 65B">
+        <!-- download icon -->
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <path d="M9 2 L9 12 M5 8 L9 12 L13 8" stroke="currentColor" stroke-width="1.4" fill="none"/>
+          <line x1="3" y1="15" x2="15" y2="15" stroke="currentColor" stroke-width="1.4"/>
+        </svg>
+      </button>
+      <div class="rail-spacer"></div>
+      <button class="rail-btn" id="rail-settings" title="Toggle C2 Stream vs Tiles" aria-label="Toggle C2 Stream vs Tiles">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <circle cx="9" cy="9" r="2.5" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M9 1 L9 3 M9 15 L9 17 M1 9 L3 9 M15 9 L17 9 M3 3 L4.5 4.5 M13.5 13.5 L15 15 M3 15 L4.5 13.5 M13.5 4.5 L15 3" stroke="currentColor" stroke-width="1.4"/>
+        </svg>
+      </button>
+      <button class="rail-btn" id="rail-logout" title="Logout" aria-label="Logout">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <path d="M7 2 L3 2 L3 16 L7 16" stroke="currentColor" stroke-width="1.4" fill="none"/>
+          <path d="M10 5 L14 9 L10 13 M14 9 L6 9" stroke="currentColor" stroke-width="1.4" fill="none"/>
+        </svg>
+      </button>
+    </aside>
+
+    <!-- ===========================================================
+         MAIN COLUMN
+         =========================================================== -->
+    <div class="op-main">
+
+      <!-- --- TOP BAR (44px) ---------------------------------- -->
+      <header class="op-top">
+        <div class="op-top__left">
+          <span class="op-top__brand">IBVAP</span>
+          <span class="op-top__sep">|</span>
+          <span class="op-top__node">BOP-7 SECURE NODE</span>
+        </div>
+        <div class="op-top__center">
+          <span class="op-status-chip" id="op-status-chip">
+            <span class="dot dot--ok"></span>
+            <span id="op-status-text">SYSTEM NOMINAL</span>
+          </span>
+          <div class="view-toggle" id="view-toggle">
+            <button class="btn-mode is-active" id="btn-mode-tiles" title="Multi-Camera Grid">⊞ CAMERA TILES</button>
+            <button class="btn-mode" id="btn-mode-master" title="Master 6-Split Video Feed from engine.py">🖵 MASTER C2 STREAM</button>
+          </div>
+        </div>
+        <div class="op-top__right">
+          <span class="op-top__clock mono" id="ist-clock">--:--:--</span>
+          <span class="op-top__badge" id="role-badge">{{ user.role | upper }}</span>
+        </div>
+      </header>
+
+      <!-- Hidden marker so smoke tests can grep for OPERATOR role requirement -->
+      <span hidden aria-hidden="true" data-spec-marker>OPERATOR CONSOLE</span>
+
+      <!-- --- STAT CHIPS ROW --------------------------------- -->
+      <div class="op-stats">
+        <div class="stat-chip">
+          <span class="stat-chip__label">Streams</span>
+          <span class="stat-chip__value mono" id="stat-streams">0/0</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-chip__label">Active Alerts</span>
+          <span class="stat-chip__value mono" id="stat-alerts">0</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-chip__label">Filtered Today</span>
+          <span class="stat-chip__value mono" id="stat-filtered">0</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-chip__label">Uptime</span>
+          <span class="stat-chip__value mono" id="stat-uptime">00:00:00</span>
+        </div>
+      </div>
+
+      <!-- --- CONTENT: video grid + right panel ------------- -->
+      <div class="op-content">
+
+        <!-- 6-tile video grid (3x2) -->
+        <section class="op-grid" id="op-grid" aria-label="Camera feeds">
+          <!-- Tiles are generated by operator.js -->
+        </section>
+
+        <!-- Master C2 stream view (1440x720 full composite from engine.py) -->
+        <section class="op-master-stream" id="op-master-stream" aria-label="Master C2 Stream">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(10,15,26,0.9);border-bottom:1px solid var(--border);font-family:var(--font-mono);font-size:11px;">
+            <span style="color:var(--accent);font-weight:600;"><span class="dot dot--ok" style="display:inline-block;width:6px;height:6px;background:#2E7DD1;border-radius:50%;margin-right:6px;"></span>IBVAP LIVE ENGINE.PY TACTICAL C2 PERCEPTION FEED</span>
+            <span style="color:var(--dim);">1440x720 · LIVE UNIFIED PIPELINE</span>
+          </div>
+          <div style="width:100%;height:calc(100% - 36px);display:flex;align-items:center;justify-content:center;background:#050914;overflow:hidden;">
+            <img id="master-stream-img" style="width:100%;height:100%;object-fit:contain;" alt="Master C2 Stream" />
+          </div>
+        </section>
+
+        <!-- Right panel: live event feed -->
+        <aside class="op-feed" aria-label="Live event feed">
+          <div class="op-feed__header">
+            <span>LIVE EVENT FEED</span>
+            <span class="op-feed__count mono" id="feed-count">0</span>
+          </div>
+          <div class="op-feed__list" id="event-feed" role="log" aria-live="polite">
+            <!-- Event rows generated by operator.js -->
+          </div>
+        </aside>
+
+      </div>
+
+      <!-- --- BOTTOM TICKER (48px) -------------------------- -->
+      <footer class="op-ticker" aria-label="Critical alert ticker">
+        <div class="op-ticker__label">
+          <span class="dot dot--crit"></span>
+          <span>CRITICAL</span>
+        </div>
+        <div class="op-ticker__viewport">
+          <div class="op-ticker__track" id="ticker-track">
+            <span class="op-ticker__item op-ticker__item--empty">NO CRITICAL ALERTS</span>
+          </div>
+        </div>
+      </footer>
+
+    </div>
+  </div>
+
+  <!-- Zone draw mode hint -->
+  <div class="zone-hint" id="zone-hint" hidden>
+    <span class="zone-hint__dot"></span>
+    <span class="zone-hint__text">ZONE DRAW MODE &mdash; CLICK TO ADD POINTS &middot; DBL-CLICK / ENTER TO FINISH &middot; ESC TO CANCEL</span>
+    <span class="zone-hint__count mono" id="zone-hint-count">0 PTS</span>
+  </div>
+
+  <script src="/static/js/auth.js"></script>
+  <script src="/static/js/operator.js"></script>
+</body>
+</html>

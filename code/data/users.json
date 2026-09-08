@@ -1,0 +1,26 @@
+{
+  "admin": {
+    "password": "pbkdf2$200000$4b7ca2420b3d5c882ecc6907aa953402$1d7b2fdddebe5f5112920a29752cfeeee3cc92bf63d6e22ae2641a271d91674d",
+    "role": "admin",
+    "display_name": "SYSADMIN",
+    "node": "BOP-7",
+    "active": true,
+    "last_login": "2026-09-09 02:06:02 IST"
+  },
+  "operator": {
+    "password": "pbkdf2$200000$a75edb46eb3593216143f4d3eb216bf6$fcc6aa9737dda9510e17a843c59f1dd3eb62914e0d7f2bbe87bcf2f782c52d66",
+    "role": "operator",
+    "display_name": "OPERATOR-01",
+    "node": "BOP-7",
+    "active": true,
+    "last_login": "2026-09-09 01:57:41 IST"
+  },
+  "auditor": {
+    "password": "pbkdf2$200000$4e5c547ef3c489f3c351c1b66ca1f699$45fcc78e47aa28b588c1a99c293dd7259f5c95a7c72955af07de1bc9768708aa",
+    "role": "auditor",
+    "display_name": "AUDITOR",
+    "node": "BOP-7",
+    "active": true,
+    "last_login": "2026-09-09 02:04:50 IST"
+  }
+}

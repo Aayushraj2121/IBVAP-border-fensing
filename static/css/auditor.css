@@ -1,0 +1,536 @@
+/* ==========================================================================
+   auditor.css — IBVAP Auditor Console stylesheet.
+   Adheres strictly to IBVAP hard constraints:
+     - STRICTLY NO VIDEO ANYWHERE
+     - 4px border-radius max
+     - No gradients, no glows, no glassmorphism, no extra shadows
+     - Exactly locked color tokens
+     - Inter for UI, JetBrains Mono for timestamps, IDs, hashes, stats
+     - 11px uppercase panel headers with 0.5px letter-spacing
+     - 8px gaps, 10-12px padding
+   ========================================================================== */
+
+.auditor-shell {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* === SIDEBAR (200px) ================================================== */
+
+.auditor-sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.auditor-brand {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.auditor-brand__title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.auditor-brand__ver {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.auditor-brand__sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.auditor-nav {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.auditor-nav__label {
+  font-size: 10px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  padding: 8px 8px 4px 8px;
+}
+
+.auditor-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  color: var(--dim);
+  background: transparent;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.auditor-nav__item:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border);
+}
+
+.auditor-nav__item.is-active {
+  color: var(--ok);
+  background: rgba(46, 158, 107, 0.08);
+  border-color: var(--ok);
+}
+
+.auditor-nav__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.auditor-sidebar__footer {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+}
+
+/* === MAIN COLUMN ====================================================== */
+
+.auditor-main {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* --- Top Bar (44px) --------------------------------------------------- */
+
+.auditor-top {
+  height: 44px;
+  min-height: 44px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  gap: var(--gap);
+}
+
+.auditor-top__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auditor-top__brand {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: -0.2px;
+  color: var(--text);
+}
+
+.auditor-top__sep {
+  color: var(--border);
+}
+
+.auditor-top__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.auditor-top__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auditor-top__clock {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.auditor-top__badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--warn);
+  background: rgba(201, 138, 43, 0.1);
+  color: var(--warn);
+  border-radius: var(--radius);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* --- Top Integrity Banner --------------------------------------------- */
+
+.integrity-banner {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  transition: background 150ms ease;
+}
+
+.integrity-banner--ok {
+  background: rgba(46, 158, 107, 0.12);
+  border-bottom-color: var(--ok);
+  color: var(--ok);
+}
+
+.integrity-banner--broken {
+  background: rgba(201, 58, 58, 0.15);
+  border-bottom-color: var(--crit);
+  color: var(--crit);
+}
+
+.integrity-banner__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.integrity-banner__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.integrity-banner__text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.integrity-banner__sub {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--dim);
+  margin-left: 8px;
+}
+
+.integrity-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.integrity-banner__btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.integrity-banner__btn:hover {
+  border-color: var(--accent);
+}
+
+/* --- Layout Grid (Timeline + Right Panel) ----------------------------- */
+
+.auditor-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: var(--gap);
+  padding: 12px 16px;
+  overflow: hidden;
+  height: calc(100vh - 44px - 44px);
+}
+
+/* --- Timeline Panel --------------------------------------------------- */
+
+.timeline-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.timeline-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Timeline Block Card */
+.timeline-block {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 120ms ease;
+  position: relative;
+}
+
+.timeline-block:hover {
+  border-color: var(--accent);
+}
+
+.timeline-block.is-selected {
+  border-color: var(--accent);
+  background: rgba(46, 125, 209, 0.05);
+}
+
+.timeline-block__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+
+.timeline-block__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.timeline-block__seq {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.timeline-block__time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.timeline-block__cam {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--dim);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1px 6px;
+}
+
+.timeline-block__body {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.timeline-block__thumb {
+  width: 72px;
+  height: 48px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timeline-block__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.timeline-block__thumb-placeholder {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--dim);
+  text-align: center;
+  line-height: 1.1;
+  padding: 2px;
+}
+
+.timeline-block__desc {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.timeline-block__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--dim);
+  padding-top: 4px;
+}
+
+.timeline-block__hash {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.timeline-block__hash-val {
+  color: var(--dim);
+}
+
+/* Chain-link Connector between blocks */
+.timeline-chain-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.timeline-chain-line {
+  width: 1px;
+  height: 8px;
+  background: var(--border);
+}
+
+.timeline-chain-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--dim);
+  margin: 2px 0;
+}
+
+/* --- Right Panel: Export Section 65B Form ----------------------------- */
+
+.export-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.export-form {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.export-notice {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-size: 10px;
+  color: var(--dim);
+  line-height: 1.35;
+}
+
+.export-notice strong {
+  color: var(--text);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-field label {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+}
+
+.form-field input,
+.form-field select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  border-color: var(--accent);
+}
+
+.form-field input.mono,
+.form-field select.mono {
+  font-family: var(--font-mono);
+}
+
+.date-range-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+}
+
+.export-btn-wrap {
+  margin-top: 4px;
+}
+
+.export-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--dim);
+  text-align: center;
+  min-height: 16px;
+}

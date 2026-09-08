@@ -1,0 +1,472 @@
+/* ==========================================================================
+   admin.css — IBVAP Administration Console stylesheet.
+   Adheres strictly to IBVAP hard constraints:
+     - 4px border-radius max
+     - No gradients, no glows, no glassmorphism, no extra shadows
+     - Exactly locked color tokens
+     - Inter for UI, JetBrains Mono for timestamps, IDs, plates, stats
+     - 11px uppercase panel headers with 0.5px letter-spacing
+     - 8px gaps, 10-12px padding
+   ========================================================================== */
+
+.admin-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* === SIDEBAR (240px expanded) ========================================= */
+
+.admin-sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.admin-brand {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-brand__title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.admin-brand__ver {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.admin-brand__sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.admin-nav {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.admin-nav__label {
+  font-size: 10px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  padding: 8px 8px 4px 8px;
+}
+
+.admin-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  color: var(--dim);
+  background: transparent;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.admin-nav__item:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border);
+}
+
+.admin-nav__item.is-active {
+  color: var(--accent);
+  background: rgba(46, 125, 209, 0.08);
+  border-color: var(--accent);
+}
+
+.admin-nav__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.admin-sidebar__footer {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+}
+
+.admin-user-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.admin-user-pill__name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.admin-user-pill__role {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* === MAIN COLUMN ====================================================== */
+
+.admin-main {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* --- Top Bar (44px) --------------------------------------------------- */
+
+.admin-top {
+  height: 44px;
+  min-height: 44px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  gap: var(--gap);
+}
+
+.admin-top__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-top__brand {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: -0.2px;
+  color: var(--text);
+}
+
+.admin-top__sep {
+  color: var(--border);
+  font-weight: 300;
+}
+
+.admin-top__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-top__center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ok);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin-top__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-top__clock {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.admin-top__badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--accent);
+  background: rgba(46, 125, 209, 0.1);
+  color: var(--accent);
+  border-radius: var(--radius);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* --- Stat Chips Row --------------------------------------------------- */
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--gap);
+  padding: var(--gap) 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.stat-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-box__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  font-weight: 500;
+}
+
+.stat-box__val {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* --- Scrollable Main Content ------------------------------------------ */
+
+.admin-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* --- Tables ----------------------------------------------------------- */
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+}
+
+.admin-table th {
+  padding: 8px 12px;
+  background: var(--bg);
+  color: var(--dim);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.admin-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.admin-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.admin-table td.plate-cell {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #FFFFFF;
+}
+
+/* --- Toggle switch ---------------------------------------------------- */
+
+.toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.toggle-btn.is-active {
+  color: var(--ok);
+  border-color: rgba(46, 158, 107, 0.4);
+  background: rgba(46, 158, 107, 0.08);
+}
+
+.toggle-btn.is-suspended {
+  color: var(--crit);
+  border-color: rgba(201, 58, 58, 0.4);
+  background: rgba(201, 58, 58, 0.08);
+}
+
+.toggle-btn .toggle-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+}
+.toggle-btn.is-active .toggle-indicator { background: var(--ok); }
+.toggle-btn.is-suspended .toggle-indicator { background: var(--crit); }
+
+/* --- Table Action buttons --------------------------------------------- */
+
+.action-btn {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: var(--radius);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--dim);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.action-btn:hover:not(:disabled) {
+  color: var(--crit);
+  border-color: var(--crit);
+  background: rgba(201, 58, 58, 0.08);
+}
+
+.action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* --- Inline Add Entry Form ------------------------------------------- */
+
+.inline-form-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inline-form-box__title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inline-form-grid {
+  display: grid;
+  grid-template-columns: 140px 180px 140px 1fr auto;
+  gap: var(--gap);
+  align-items: end;
+}
+
+.inline-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inline-field label {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+}
+
+.inline-field input,
+.inline-field select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.inline-field input:focus,
+.inline-field select:focus {
+  border-color: var(--accent);
+}
+
+.inline-field input.mono {
+  font-family: var(--font-mono);
+}
+
+.inline-form-actions {
+  display: flex;
+  gap: 6px;
+}

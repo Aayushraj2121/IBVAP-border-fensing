@@ -53,7 +53,14 @@ def generate_section_65b_certificate(
     else:
         rec = records[incident_index]
 
-    ok, bad, msg, head = verify_chain()
+    v_res = verify_chain()
+    if isinstance(v_res, dict):
+        ok = (v_res.get("status") == "OK")
+        bad = v_res.get("broken_at_seq")
+        msg = v_res.get("detail", f"Chain {'intact' if ok else 'broken'}")
+        head = v_res.get("head", "")
+    else:
+        ok, bad, msg, head = v_res
     chain_status = "CRYPTOGRAPHICALLY VERIFIED & UNTAMPERED" if ok else f"INTEGRITY FAILED: {msg}"
     chain_color = "#16a34a" if ok else "#dc2626"
 
