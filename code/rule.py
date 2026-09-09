@@ -416,7 +416,8 @@ while True:
                 sealed = append_event(rec)          # 🔐 ledger
                 dispatch_webhook(rec)               # 📡 C2
                 print("🚨", sev, "| score", score, "|", breakdown)
-                print("🔐 sealed | head:", sealed["hash"][:16])
+                head_hash = sealed.get("this_hash", sealed.get("hash", "UNKNOWN")) if isinstance(sealed, dict) else "UNKNOWN"
+                print("🔐 sealed | head:", head_hash[:16])
                 print("\a", end="")
 
     # ---- PATH 2: MOG2 motion anomaly in zones (works when YOLO sees nothing) ----
@@ -433,7 +434,8 @@ while True:
                    "snapshot": fname, "snapshot_sha256": file_sha256(fname)}
             sealed = append_event(rec)              # 🔐 sealed
             dispatch_webhook(rec)                   # 📡 pushed to C2
-            print("🌙 MOG2 anomaly in zone | sealed:", sealed["hash"][:12])
+            head_hash = sealed.get("this_hash", sealed.get("hash", "UNKNOWN")) if isinstance(sealed, dict) else "UNKNOWN"
+            print("🌙 MOG2 anomaly in zone | sealed:", head_hash[:12])
 
     # ---- FRS watchlist alerts (independent of zones) ----
     for (fbx, fby, fbw, fbh), name, score in frs_matches:
@@ -453,8 +455,9 @@ while True:
                    "snapshot_sha256": file_sha256(fname)}
             sealed = append_event(rec)              # 🔐 sealed
             dispatch_webhook(rec)                   # 📡 C2
+            head_hash = sealed.get("this_hash", sealed.get("hash", "UNKNOWN")) if isinstance(sealed, dict) else "UNKNOWN"
             print("🚨 FRS WATCHLIST MATCH:", name, "|", round(score, 3),
-                  "| sealed:", sealed["hash"][:12])
+                  "| sealed:", head_hash[:12])
             print("\a", end="")
         elif name:
             cv2.rectangle(frame, (fbx, fby), (fbx + fbw, fby + fbh), (255, 0, 255), 2)

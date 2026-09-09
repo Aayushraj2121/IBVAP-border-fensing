@@ -112,6 +112,7 @@ def append_event(event: Dict[str, Any]) -> Dict[str, Any]:
         "ts": ts,
         "prev_hash": prev_hash,
         "this_hash": this_hash,
+        "hash": this_hash,
         "event": event,
     }
 
